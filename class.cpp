@@ -26,16 +26,14 @@ public:
 
 
 };
-
 object::object(){
     this->x = 0;
     this->y = 0;
     this->stx = 0;
     this->sty = 0;
-    this->collasion = false;
 }
 
-void object::set_pos(float x0, float y0){
+void object::set_pos(float x0, float y0) {
     this->x = x0;
     this->y = y0;
 }
@@ -111,8 +109,47 @@ public:
     action();
 };
 
+class soyjak_typical: public monster {
+protected:
+    float x0, y0; // monster walks around this point
+    int walking_radius; // max radius from the point (x0; y0)
+    int attack_radius; // if player is closer than this radius, monster attacks
+    bool right_direction;
+public:
+    soyjak_typical(float x0, float y0) {
+        this->hp = 6;
+        this->armor = 3;
+        this->damage = 2;
+        this->speed = 3;
+        this->x0 = x0;
+        this->y0 = y0;
+        this->walking_radius = 10;
+        this->attack_radius = 5;
+        this->right_direction = true;
+    };
 
+    ~soyjak_typical() {
+        delete this;
+    };
 
-
-
-
+    void behavior() {
+        // walking (now exists only on x-axis)
+        if (this->right_direction) {
+            if (this->x <= this->x0 + walking_radius) {
+                this->x += this->speed;
+            } else {
+                this->right_direction = false;
+            }
+        } else {
+            if (this->x >= this->x0 - walking_radius) {
+                this->x -= this->speed;
+            } else {
+                this->right_direction = true;
+            }
+        }
+        // attack (attacks only on x-axis)
+        if (pow(pow(player.get_x() - this->x, 2) + pow(player.get_y() - this->y, 2), 1/2) {
+            // change of image to attacking image
+        /
+    };
+};
