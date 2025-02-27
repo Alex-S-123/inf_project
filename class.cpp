@@ -236,6 +236,14 @@ public:
 
 
 int main(){
+    int** level = new int* [10];
+    for(int i = 0; i < 10; i++){
+	level[i] = new int[15];
+	for(int j = 0; j < 15; j++){
+	    level[i][j] = 1;
+	}
+    }
+	level[3][4] = 0;
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape* monsters = new RectangleShape[monster_types]; //number of monster types
@@ -267,8 +275,8 @@ int main(){
     window.clear(Color(192, 192, 192));
             for(int j = 0; j < n; j++){
             for(int i = 0; i < n; i++){
-                if(player_1->get_x()-(n/2-i)*30 >= 0 && player_1->get_y()-(n/2-j)*30 >= 0 && player_1->get_x()+(i-n/2)*30 <= 390 && player_1->get_y()+(j-n/2)*30 <= 300){
-                    field.setPosition(30-player_1->get_y()%30+30*j, 30 - player_1->get_x()%30 + 30*i);
+                if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
+                    field.setPosition(30-player_1->get_y()+30*i, 30 - player_1->get_x() + 30*j);
                     window.draw(field);
                 }
             }
@@ -278,3 +286,4 @@ int main(){
     }
     return 0;
 }
+
