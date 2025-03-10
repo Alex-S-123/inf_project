@@ -1,5 +1,6 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
+#include <fstream>
                                 //uncomment to test
 using namespace sf;
 
@@ -65,13 +66,15 @@ protected:
     effect* effects;    //because we have this
     item* inner;
 public:
-    player(int sx, int sy, int tx0, int ty0) : object(sx, sy, tx0, ty0){
+    player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
+		x = x0;
+		y = y0;
     }
-    void action(){
-	if(Keyboard::isKeyPressed(Keyboard::W)) x -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::S)) x += 1;
-	if(Keyboard::isKeyPressed(Keyboard::A)) y -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::D)) y += 1;
+    void action(int** level, int p, int q){
+	if(Keyboard::isKeyPressed(Keyboard::W) && (x-1>0) && (level[y/30+1][(x-1)/30+1] != 0) && (level[(y+10)/30+1][(x-1)/30+1] != 0)) x -= 1;
+	if(Keyboard::isKeyPressed(Keyboard::S) && (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] != 0) && (level[(y+10)/30+1][(x+26)/30+1] != 0)) x += 1;
+	if(Keyboard::isKeyPressed(Keyboard::A) && (y-1 > 0) && (level[(y-1)/30+1][x/30+1] != 0) && (level[(y-1)/30+1][(x+25)/30+1] != 0) ) y -= 1;
+	if(Keyboard::isKeyPressed(Keyboard::D) && (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] != 0) && (level[(y+11)/30+1][(x+25)/30+1] != 0)) y += 1;
     }
 };
 
@@ -149,7 +152,7 @@ public:
 
     ~soyjak_typical() {
         delete[] inner;
-	delete[] effects;
+		delete[] effects;
     }
 
     void behavior() {
@@ -176,25 +179,36 @@ public:
 
 
 int main(){
-    int** level = new int* [10];
-    for(int i = 0; i < 10; i++){
-	level[i] = new int[15];
-	for(int j = 0; j < 15; j++){
-	    level[i][j] = 1;
+	std::ifstream f("field.txt");
+	int p, q;
+	f >> p >> q;
+    int** level = new int* [p+2];
+	level[0] = new int [q+2];
+	level[p+1] = new int [q+2];
+	for(int i = 1; i < q+2; i++){
+		level[0][i] = 0;
+		level[p+1][i] = 0;
 	}
-    }
-	level[3][4] = 0;
+	for(int i = 1; i < p+1; i++){
+		level[i] = new int[15];
+		for(int j = 0; j < q+2; j++){
+			if(j == 0 || j == q+1)level[i][j] = 0;
+			else f >> level[i][j];
+		}
+	}
+	f.close();
     int n = 20; //number of plates we see
     int monster_types = 1;
-    RectangleShape* monsters = new RectangleShape[monster_types]; //number of monster types
+    RectangleShape* monsters_tex = new RectangleShape[monster_types]; //number of monster types
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
     field.setFillColor(Color(90, 90, 90));
     RectangleShape play(Vector2f(10, 25));
     play.setFillColor(Color(0, 0, 0));
     play.setPosition(330, 330);
     for(int i = 0; i < monster_types; i++)
-        monsters[i] = RectangleShape(Vector2f(25, 25));
-    player* player_1 = new player(0,0,10,10);
+        monsters_tex[i] = RectangleShape(Vector2f(25, 25));
+	int cx = 0, cy= 0;
+    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
 
     VideoMode vid;
 	vid.width = 30*(n+2);
@@ -206,32 +220,22 @@ int main(){
         Event event;
         while (window.pollEvent(event))
         {
-        //all actions of player, monsters, and others
-		player_1->action();
-		if (event.type == Event::Closed) window.close();
+        	//all actions of player, monsters, and others
+			player_1->action(level, p, q);
+			if (event.type == Event::Closed) window.close();
         }
 
     window.clear(Color(192, 192, 192));
-            for(int j = 0; j < 15; j++){
+        for(int j = 0; j < 15; j++){
             for(int i = 0; i < 10; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
-                    field.setPosition(30-player_1->get_y()+30*i, 30 - player_1->get_x() + 30*j);
+                    field.setPosition(30-player_1->get_y()+30*i + (-cx+9)*30, 30 - player_1->get_x() + 30*j + (-cy+9)*30);
                     window.draw(field);
                 }
             }
-            }
+        }
 	    window.draw(play);
         window.display();
     }
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
