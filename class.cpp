@@ -1,6 +1,7 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
 #include <fstream>
+#include <chrono>
                                 //uncomment to test
 using namespace sf;
 
@@ -52,11 +53,11 @@ protected:
     effect* effects;    //because we have this
     item* inner;
 public:
-    monster();
+    monster():object(0,0,0,0){};
     void damaged(int damag);
     int atack();
     int get_type(){return this->type;}
-    virtual void behavior() = 0;
+    virtual void behavior(){};
 };
 
 class player: public object{
@@ -71,10 +72,10 @@ public:
 		y = y0;
     }
     void action(int** level, int p, int q){
-	if(Keyboard::isKeyPressed(Keyboard::W) && (x-1>0) && (level[y/30+1][(x-1)/30+1] != 0) && (level[(y+10)/30+1][(x-1)/30+1] != 0)) x -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::S) && (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] != 0) && (level[(y+10)/30+1][(x+26)/30+1] != 0)) x += 1;
-	if(Keyboard::isKeyPressed(Keyboard::A) && (y-1 > 0) && (level[(y-1)/30+1][x/30+1] != 0) && (level[(y-1)/30+1][(x+25)/30+1] != 0) ) y -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::D) && (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] != 0) && (level[(y+11)/30+1][(x+25)/30+1] != 0)) y += 1;
+	if(Keyboard::isKeyPressed(Keyboard::W) && (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x -= 1;
+	if(Keyboard::isKeyPressed(Keyboard::S) && (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x += 1;
+	if(Keyboard::isKeyPressed(Keyboard::A) && (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0) ) y -= 1;
+	if(Keyboard::isKeyPressed(Keyboard::D) && (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
     }
 };
 
@@ -138,16 +139,18 @@ protected:
     bool right_direction;
     //need texture size!
 public:
-    soyjak_typical(float x0, float y0) {
+    soyjak_typical(int xp, int yp){
         this->hp = 6;
         this->armor = 3;
         this->damage = 2;
-        this->speed = 3;
+        this->speed = 1;
         this->xp = xp;
         this->yp = yp;
-        this->walking_radius = 10;
+        this->walking_radius = 50;
         this->attack_radius = 5;
         this->right_direction = true;
+		this->type = 1;
+		this->set_pos(xp, yp);
     }
 
     ~soyjak_typical() {
@@ -197,16 +200,18 @@ int main(){
 		}
 	}
 	f.close();
+	monster** monsters_list = new monster*[1];
+	monsters_list[0] = new soyjak_typical(150, 150);
     int n = 20; //number of plates we see
     int monster_types = 1;
-    RectangleShape* monsters_tex = new RectangleShape[monster_types]; //number of monster types
+    RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
+	monsters_tex[0] = new RectangleShape(Vector2f(15, 30));
+	monsters_tex[0]->setFillColor(Color(128, 0, 0));
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
     field.setFillColor(Color(90, 90, 90));
     RectangleShape play(Vector2f(10, 25));
     play.setFillColor(Color(0, 0, 0));
     play.setPosition(330, 330);
-    for(int i = 0; i < monster_types; i++)
-        monsters_tex[i] = RectangleShape(Vector2f(25, 25));
 	int cx = 0, cy= 0;
     player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
 
@@ -216,12 +221,18 @@ int main(){
     RenderWindow window(vid, L"Game", Style::Default);
     while (window.isOpen())
     {
+		auto start = std::chrono::system_clock::now();
+		//all actions of player, monsters, and others
+		for(int i = 0; i < 1; i++){
+				monsters_list[i]->behavior();
+			}
+			player_1->action(level, p, q);
 
         Event event;
         while (window.pollEvent(event))
         {
-        	//all actions of player, monsters, and others
-			player_1->action(level, p, q);
+        	
+			
 			if (event.type == Event::Closed) window.close();
         }
 
@@ -229,13 +240,20 @@ int main(){
         for(int j = 0; j < 15; j++){
             for(int i = 0; i < 10; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
-                    field.setPosition(30-player_1->get_y()+30*i + (-cx+9)*30, 30 - player_1->get_x() + 30*j + (-cy+9)*30);
+                    field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
                     window.draw(field);
                 }
             }
         }
+		for(int i = 0; i < 1; i++){
+			if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
+				monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
+				window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
+			}		
+		}
 	    window.draw(play);
         window.display();
+		while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
     }
     return 0;
 }
