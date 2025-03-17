@@ -70,12 +70,13 @@ public:
     player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
 		x = x0;
 		y = y0;
+		speed = 1;
     }
     void action(int** level, int p, int q){
-	if(Keyboard::isKeyPressed(Keyboard::W) && (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::S) && (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x += 1;
-	if(Keyboard::isKeyPressed(Keyboard::A) && (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0) ) y -= 1;
-	if(Keyboard::isKeyPressed(Keyboard::D) && (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+	if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
+	if(Keyboard::isKeyPressed(Keyboard::S) && (x+25 + speed < q*30-30) && (level[y/30+1][(x+25+speed)/30+1] > 0) && (level[(y+10)/30+1][(x+25 + speed)/30+1] > 0)) x += speed;
+	if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+25)/30+1] > 0) ) y -= speed;
+	if(Keyboard::isKeyPressed(Keyboard::D) && (y+10+speed < p*30-30) && (level[(y+10+speed)/30+1][x/30+1] > 0) && (level[(y+10+speed)/30+1][(x+25)/30+1] > 0)) y += speed;
     }
 };
 
@@ -136,17 +137,18 @@ protected:
     int xp, yp; // monster walks around this point
     int walking_radius; // max radius from the point (x0; y0)
     int attack_radius; // if player is closer than this radius, monster attacks
-    bool right_direction;
+    bool right_direction, x_direction;
     //need texture size!
 public:
-    soyjak_typical(int xp, int yp){
+    soyjak_typical(int xp, int yp, int rad, bool x_dir){
+		this-> x_direction = x_dir;
         this->hp = 6;
         this->armor = 3;
         this->damage = 2;
         this->speed = 1;
         this->xp = xp;
         this->yp = yp;
-        this->walking_radius = 50;
+        this->walking_radius = rad;
         this->attack_radius = 5;
         this->right_direction = true;
 		this->type = 1;
@@ -160,19 +162,37 @@ public:
 
     void behavior() {
         // walking (now exists only on x-axis)
-        if (this->right_direction) {
-            if (this->x <= this->x0 + walking_radius) {
-                this->x += this->speed;
-            } else {
-                this->right_direction = false;
-            }
-        } else {
-            if (this->x >= this->x0 - walking_radius) {
-                this->x -= this->speed;
-            } else {
-                this->right_direction = true;
-            }
-        }
+		if(this->x_direction){
+		    if (this->right_direction) {
+		        if (this->x <= this->x0 + walking_radius) {
+		            this->x += this->speed;
+		        } else {
+		            this->right_direction = false;
+		        }
+		    } else {
+		        if (this->x >= this->x0 - walking_radius) {
+		            this->x -= this->speed;
+		        } else {
+		            this->right_direction = true;
+		        }
+		    }
+		}
+		else{
+			if (this->right_direction) {
+		        if (this->y <= this->y0 + walking_radius) {
+		            this->y += this->speed;
+		        } else {
+		            this->right_direction = false;
+		        }
+		    } else {
+		        if (this->y >= this->y0 - walking_radius) {
+		            this->y -= this->speed;
+		        } else {
+		            this->right_direction = true;
+		        }
+		    }
+
+		}
         // attack (attacks only on x-axis)
         //if (pow(pow(player.get_x() - this->x, 2) + pow(player.get_y() - this->y, 2), 1/2)) {
             // change of image to attacking image
@@ -200,8 +220,22 @@ int main(){
 		}
 	}
 	f.close();
-	monster** monsters_list = new monster*[1];
-	monsters_list[0] = new soyjak_typical(150, 150);
+
+
+
+	std::ifstream fm("monsters.txt");
+	int num_of_monsters;
+	fm >> num_of_monsters;
+	monster** monsters_list = new monster*[num_of_monsters];
+	for(int i = 0; i < num_of_monsters; i++){
+		int type, x0, y0;
+		fm >> type;
+		if(type == 1){
+			int rad, dir;
+			fm >> x0 >> y0 >> rad >> dir;
+			monsters_list[i] = new soyjak_typical(x0, y0, rad, dir);
+		}
+	}
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
@@ -223,7 +257,7 @@ int main(){
     {
 		auto start = std::chrono::system_clock::now();
 		//all actions of player, monsters, and others
-		for(int i = 0; i < 1; i++){
+		for(int i = 0; i < num_of_monsters; i++){
 				monsters_list[i]->behavior();
 			}
 			player_1->action(level, p, q);
@@ -237,15 +271,15 @@ int main(){
         }
 
     window.clear(Color(192, 192, 192));
-        for(int j = 0; j < 15; j++){
-            for(int i = 0; i < 10; i++){
+        for(int j = 0; j < q; j++){
+            for(int i = 0; i < p; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
                     field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
                     window.draw(field);
                 }
             }
         }
-		for(int i = 0; i < 1; i++){
+		for(int i = 0; i < num_of_monsters; i++){
 			if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
 				monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
 				window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
