@@ -2,13 +2,14 @@
 #include <SFML/Graphics.hpp>
 #include <fstream>
 #include <chrono>
+#include <cmath>
                                 //uncomment to test
 using namespace sf;
 
 class object{
 protected:
     int x, y; //coords
-    int x0, y0, x1, y1; //texture rect 
+    int x0, y0, x1, y1; //texture rect
 public:
     object(int sx, int sy, int tx0, int ty0){
         this->x = 0;
@@ -26,6 +27,12 @@ public:
 
 
     int get_x() {return this->x;}
+    int get_centre_x() {
+        return (this->x1 - this->x0) / 2;
+    }
+    int get_centre_y() {
+        return (this->y1 - this->y0) / 2;
+    }
 
     int get_y() {return this->y;}
 
@@ -54,9 +61,16 @@ protected:
     item* inner;
 public:
     monster():object(0,0,0,0){};
+    ~monster(){};
     void damaged(int damag);
     int atack();
     int get_type(){return this->type;}
+    int get_hp() {
+        return this->hp;
+    }
+    void set_hp(int delta_hp) {
+        this->hp += delta_hp;
+    }
     virtual void behavior(){};
 };
 
@@ -66,16 +80,52 @@ protected:
     int type;
     effect* effects;    //because we have this
     item* inner;
+    bool attack;
 public:
-    player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
+    std::chrono::time_point<std::chrono::system_clock> last_hit;
+    player(int sx, int sy, int tx0, int ty0, int x0, int y0, int d) : object(sx, sy, tx0, ty0){
 		x = x0;
 		y = y0;
+		attack = false;
+		damage = d;
     }
-    void action(int** level, int p, int q){
+    bool get_attack() {
+        return attack;
+    }
+    int get_damage() {
+        return this->damage;
+    }
+    void action(int** level, int p, int q, monster** monsters_list, int n){
 	if(Keyboard::isKeyPressed(Keyboard::W) && (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x -= 1;
 	if(Keyboard::isKeyPressed(Keyboard::S) && (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x += 1;
 	if(Keyboard::isKeyPressed(Keyboard::A) && (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0) ) y -= 1;
 	if(Keyboard::isKeyPressed(Keyboard::D) && (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+	if(Keyboard::isKeyPressed(Keyboard::Q)) attack = true;
+	if(Keyboard::isKeyPressed(Keyboard::Q) == false) attack = false;
+
+
+    for(int i = 0; i < n; i++) {
+            if (monsters_list[i] != NULL) {
+                // player damages kills monsters
+                // attack works for center of monster and player
+                auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
+                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_x() - this->get_x() + monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)
+                                                              + pow(monsters_list[i]->get_y() - this->get_y() + monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < 10)) {
+                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > 3000) {
+                        if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
+                            monsters_list[i]->set_hp(-1 * this->get_damage());
+                            std::cout << "time delta: " << time_delta << std::endl;
+                            std::cout << "monster damaged, monster's hp: " << monsters_list[i]->get_hp() << std::endl;
+                            this->last_hit = std::chrono::system_clock::now();
+                        } else {
+                            monsters_list[i] = NULL;
+                            std::cout << "monster killed!" << std::endl;
+                        }
+                        //play.setFillColor(Color(0, 0, 150));
+                    }
+                }
+            }
+        }
     }
 };
 
@@ -213,26 +263,23 @@ int main(){
     play.setFillColor(Color(0, 0, 0));
     play.setPosition(330, 330);
 	int cx = 0, cy= 0;
-    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
+    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy, 1);
+
 
     VideoMode vid;
 	vid.width = 30*(n+2);
 	vid.height = 30*(n+2); //change to size of window
     RenderWindow window(vid, L"Game", Style::Default);
+
+    int radius_kill = 100;
     while (window.isOpen())
     {
 		auto start = std::chrono::system_clock::now();
-		//all actions of player, monsters, and others
-		for(int i = 0; i < 1; i++){
-				monsters_list[i]->behavior();
-			}
-			player_1->action(level, p, q);
-
+        monsters_list[0]->behavior();
+        player_1->action(level, p, q, monsters_list, 1);
         Event event;
         while (window.pollEvent(event))
         {
-        	
-			
 			if (event.type == Event::Closed) window.close();
         }
 
@@ -240,16 +287,24 @@ int main(){
         for(int j = 0; j < 15; j++){
             for(int i = 0; i < 10; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
+                    if (player_1->get_attack() == true) {
+                        play.setFillColor(Color(255, 0, 0));
+                    } else {
+                        play.setFillColor(Color(0, 0, 0));
+                    }
+
                     field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
                     window.draw(field);
                 }
             }
         }
 		for(int i = 0; i < 1; i++){
-			if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
-				monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
-				window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
-			}		
+            if (monsters_list[i] != NULL) {
+                if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
+                    monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
+                    window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
+                }
+            }
 		}
 	    window.draw(play);
         window.display();
