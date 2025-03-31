@@ -121,8 +121,7 @@ public:
                 // player damages kills monsters
                 // attack works for center of monster and player
                 auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
-                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_x() - this->get_x() + monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)
-                                                              + pow(monsters_list[i]->get_y() - this->get_y() + monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < 10)) {
+                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < 25)) {
                     if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > 3000) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
                             monsters_list[i]->set_hp(-1 * this->get_damage());
@@ -138,7 +137,7 @@ public:
                 }
             }
         }
-    }
+    } 
 };
 
 
@@ -266,6 +265,8 @@ public:
 
 int main(){
 	std::ifstream f("field.txt");
+	bool inv_open = false;
+	int inv_x = 0,  inv_y = 0;
 	int p, q;
 	f >> p >> q;
     int** level = new int* [p+2];
@@ -309,6 +310,19 @@ int main(){
     RectangleShape play(Vector2f(10, 25));
     play.setFillColor(Color(0, 0, 0));
     play.setPosition(330, 330);
+
+	RectangleShape inv_back(Vector2f(550, 600));
+	inv_back.setFillColor(Color(139, 69, 19));
+	inv_back.setPosition(55, 40);	
+	RectangleShape inv_item(Vector2f(60, 60));
+	inv_item.setFillColor(Color(0, 0, 0));
+	RectangleShape inv_ch(Vector2f(70, 70));
+	inv_ch.setFillColor(Color(250, 250, 250));
+	RectangleShape inv_bord(Vector2f(5, 600));
+	inv_bord.setFillColor(Color(70, 70, 70));
+
+
+
 	int cx = 0, cy= 0;
     player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
 
@@ -320,10 +334,30 @@ int main(){
     {
 		auto start = std::chrono::system_clock::now();
 		//all actions of player, monsters, and others
+		if(Keyboard::isKeyPressed(Keyboard::R)){
+			if(inv_open) inv_open = false;
+			else inv_open = true;
+			while (Keyboard::isKeyPressed(Keyboard::R)) continue; //not good, but I do not see other ways
+			inv_x = 0;
+			inv_y = 0;
+		}
 		for(int i = 0; i < num_of_monsters; i++){
 				if(monsters_list[i])monsters_list[i]->behavior();
 			}
-			player_1->action(level, p, q, monsters_list, num_of_monsters);
+		if(!inv_open)player_1->action(level, p, q, monsters_list, num_of_monsters);
+		else{
+			if(Keyboard::isKeyPressed(Keyboard::W)) inv_x -= 1;
+			if(Keyboard::isKeyPressed(Keyboard::S)) inv_x += 1;
+			if(Keyboard::isKeyPressed(Keyboard::A)) inv_y -= 1;
+			if(Keyboard::isKeyPressed(Keyboard::D)) inv_y += 1;
+    		//if(Keyboard::isKeyPressed(Keyboard::Q))   swap thing between ground and treasure
+			//if(Keyboard::isKeyPressed(Keyboard::E))   wear
+			if(inv_x < 0) inv_x = 7;
+			if(inv_x > 7) inv_x = 0;
+			if(inv_y < 0) inv_y = 5;
+			if(inv_y > 5) inv_y = 0;
+			while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::A)||Keyboard::isKeyPressed(Keyboard::D)||Keyboard::isKeyPressed(Keyboard::Q)||Keyboard::isKeyPressed(Keyboard::E)) continue;
+		}
 
         Event event;
         while (window.pollEvent(event))
@@ -351,6 +385,29 @@ int main(){
             }
 		}
 	    window.draw(play);
+		if(inv_open){
+			window.draw(inv_back);
+			inv_ch.setPosition(55+130+inv_y*70-5, 40+40+inv_x*70-5);
+			window.draw(inv_ch);
+			inv_bord.setPosition(55+125-2, 40);
+			window.draw(inv_bord);
+			inv_bord.setPosition(55+125+210-2, 40);
+			window.draw(inv_bord);
+			for(int i = 0; i < 48; i++){
+				inv_item.setPosition(55+130+(i%6)*70, 40+40+(i/6)*70);
+				window.draw(inv_item);
+			}
+			inv_item.setPosition(55+15, 40+40+40);
+			window.draw(inv_item);
+			inv_item.setPosition(55+15, 40+40+40+140);
+			window.draw(inv_item);
+			inv_item.setPosition(55+15, 40+40+40+280);
+			window.draw(inv_item);
+			inv_item.setPosition(55+15, 40+40+40+280+140);
+			window.draw(inv_item);
+			
+
+		}
         window.display();
 		while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
     }
