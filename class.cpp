@@ -3,14 +3,31 @@
 #include <fstream>
 #include <chrono>
 #include <cmath>
-                                //uncomment to test
+#include <vector>
+                               
 using namespace sf;
+
+
+class item{
+protected:
+    int boost_damage, boost_armor, boost_hp, use_before_break, time_of_active;
+    int x0, y0, x1, y1; //texture rect for menue
+    char* name;
+public:
+    //virtual void use_item() = 0;
+};
+
 
 class object{
 protected:
     int x, y; //coords
     int x0, y0, x1, y1; //texture rect
+	int type;
+	bool collision;
+	int n;
+    
 public:
+	item** inner;
     object(int sx, int sy, int tx0, int ty0){
         this->x = 0;
         this->y = 0;
@@ -18,6 +35,11 @@ public:
         this->y1 = sy;
         this->x0 = tx0;
         this->y0 = ty0;
+		type = 0;
+		inner = new item*[24];
+		for(int i = 0; i < 24; i++) inner[i] = NULL;
+		n = 0;
+		collision = false;
     }
 
     void set_pos(float x0, float y0){
@@ -35,18 +57,27 @@ public:
     int get_x() {return this->x;}
 
     int get_y() {return this->y;}
-
+	int get_type() {return type; }
+	bool get_collision() {return collision;}
+	bool give(item* it){
+		if(n == 24||it==NULL) return 0;
+		inner[n] = it;
+		n++;
+		return 1;	
+	}
+    item* take(int i){
+		if(i > n) return NULL;
+		item* res = inner[i];
+		for(int j = i; j < n-1; j++) inner[j] = inner[j+1];
+		inner[n-1] = NULL;
+		n--;
+		return res;	
+	}
+	
 
 };
 
-class item{
-protected:
-    int boost_damage, boost_armor, boost_hp, use_before_break, time_of_active;
-    int x0, y0, x1, y1; //texture rect for menue
-    char* name;
-public:
-    virtual void use_item() = 0;
-};
+
 
 
 class effect: public item{
@@ -56,7 +87,6 @@ class effect: public item{
 class monster: public object{
 protected:
     int hp, armor, damage, speed;
-    int type;
     effect* effects;    //because we have this
     item* inner;
 public:
@@ -76,17 +106,21 @@ public:
 class player: public object{
 protected:
     int hp, armor, damage, speed;
-    int type;
     effect* effects;    //because we have this
-    item* inner;
+    
+	int num_of_items;
     bool attack;
 public:
+	item** inner;
     std::chrono::time_point<std::chrono::system_clock> last_hit;
     player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
 		x = x0;
 		y = y0;
 		speed = 1;
 		damage = 1;
+		inner = new item*[28];
+		num_of_items = 0;
+		for(int i = 0; i < 28; i++) inner[i] = NULL;
     }
     bool get_attack() {
         return attack;
@@ -94,7 +128,23 @@ public:
     int get_damage() {
         return this->damage;
     }
-    void action(int** level, int p, int q, monster** monsters_list, int n){
+
+    bool give(item* it){
+		if(num_of_items == 24||it==NULL) return 0;
+		inner[num_of_items+4] = it;
+		num_of_items++;
+		return 1;	
+	}
+    item* take(int i){
+		if(i >= num_of_items) return NULL;
+		item* res = inner[i+4];
+		for(int j = i+4; j < num_of_items+3; j++) inner[j] = inner[j+1];
+		inner[num_of_items+3] = NULL;
+		num_of_items--;
+		return res;	
+	}
+
+    void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
 	if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
 	if(Keyboard::isKeyPressed(Keyboard::S) && (x+25 + speed < q*30-30) && (level[y/30+1][(x+25+speed)/30+1] > 0) && (level[(y+10)/30+1][(x+25 + speed)/30+1] > 0)) x += speed;
 	if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+25)/30+1] > 0) ) y -= speed;
@@ -103,7 +153,7 @@ public:
 	if(Keyboard::isKeyPressed(Keyboard::Q) == false) attack = false;
 
 	for(int i = 0; i < n; i++){
-		if(monsters_list[i] != NULL){
+		if(monsters_list[i] != NULL && monsters_list[i]->get_collision()){
 			while((x+25 >= monsters_list[i]->get_x())&&(x+25<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
 					&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
 			while((x >= monsters_list[i]->get_centre_x())&&(x<=2*monsters_list[i]->get_centre_x()-monsters_list[i]->get_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
@@ -114,6 +164,18 @@ public:
 					&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
 		}
 	}
+	for(int i = 0; i < no; i++){
+		if(objects_list[i] != NULL && objects_list[i]->get_collision()){
+			while((x+25 >= objects_list[i]->get_x())&&(x+25<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
+					&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
+			while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
+					&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
+			while((y+10 >= objects_list[i]->get_y())&&(y+10<=objects_list[i]->get_centre_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
+					&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
+			while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
+					&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+		}
+	}			//collision does not work  
 
 
     for(int i = 0; i < n; i++) {
@@ -144,11 +206,16 @@ public:
 class treasure: public object{
 protected:
     int n;
-    item* inner;
+    
 public:
-    treasure();
-    bool give(item it);
-    bool take(int i);
+	item** inner;
+    treasure(int x, int y):object(0, 0, 15, 15){
+		type = 1;
+		n = 0;
+		inner = new item*[24];
+		set_pos(x, y);
+		collision = true;
+	}
 };
 
 class wall: public object{
@@ -168,7 +235,7 @@ public:
 };
 
 class chest:public treasure, public gate{
-    bool take(int i);
+    item* take(int i);
 };
 
 class teleport:public gate{
@@ -183,7 +250,7 @@ public:
     char* read();
 };
 
-class seller: public sign{
+class seller: public treasure{
 protected:
     int* inner;
     int* price;
@@ -215,6 +282,7 @@ public:
 		this->set_pos(xp, yp);
 		y1 = 15;
 		x1 = 30;
+		collision = true;
     }
 
     ~soyjak_typical() {
@@ -300,11 +368,32 @@ int main(){
 			monsters_list[i] = new soyjak_typical(x0, y0, rad, dir);
 		}
 	}
+
+
+	std::ifstream fo("objects.txt");
+	int num_of_objects;
+	fo >> num_of_objects;
+	object** objects_list = new object*[2*(num_of_objects+num_of_monsters)];
+	for(int i = 0; i < num_of_objects; i++){
+		int type, x0, y0;
+		fo >> type >> x0 >> y0;
+		if(type == 1){
+			objects_list[i] = new treasure(x0, y0);
+		}
+		// here is creating new objects from file
+	}
+
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
 	monsters_tex[0] = new RectangleShape(Vector2f(15, 30));
 	monsters_tex[0]->setFillColor(Color(128, 0, 0));
+
+	int object_types = 1;
+    RectangleShape** objects_tex = new RectangleShape*[object_types];
+	objects_tex[0] = new RectangleShape(Vector2f(15, 15));
+	objects_tex[0]->setFillColor(Color(0, 128, 0));
+
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
     field.setFillColor(Color(90, 90, 90));
     RectangleShape play(Vector2f(10, 25));
@@ -322,6 +411,7 @@ int main(){
 	inv_bord.setFillColor(Color(70, 70, 70));
 
 
+	objects_list[0]->give(new item);
 
 	int cx = 0, cy= 0;
     player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
@@ -344,14 +434,48 @@ int main(){
 		for(int i = 0; i < num_of_monsters; i++){
 				if(monsters_list[i])monsters_list[i]->behavior();
 			}
-		if(!inv_open)player_1->action(level, p, q, monsters_list, num_of_monsters);
+		if(!inv_open)player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
 		else{
 			if(Keyboard::isKeyPressed(Keyboard::W)) inv_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) inv_x += 1;
 			if(Keyboard::isKeyPressed(Keyboard::A)) inv_y -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::D)) inv_y += 1;
-    		//if(Keyboard::isKeyPressed(Keyboard::Q))   swap thing between ground and treasure
-			//if(Keyboard::isKeyPressed(Keyboard::E))   wear
+    		if(Keyboard::isKeyPressed(Keyboard::Q)){
+				int ind = -1;
+				//std::cout << abs(player_1->get_centre_x()-objects_list[0]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[0]->get_centre_y()) << std::endl;
+				for(int i = 0; i < num_of_objects; i++){
+					if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;				
+				}
+				if(ind>=0){
+					//std::cout << 1 << std::endl;
+					object* tr = objects_list[ind];
+					if(inv_y < 3)tr->give(player_1->take(inv_x*3+inv_y));
+					else player_1->give(tr->take(inv_x*3+inv_y-3));
+				}
+			}
+			if(Keyboard::isKeyPressed(Keyboard::E)){
+				if(inv_y < 3){
+					item* tmp = player_1->take(inv_x*3+inv_y);
+					if(player_1->inner[0]!=tmp) {
+						player_1->give(player_1->inner[0]);
+						player_1->inner[0] = tmp;
+					}
+					else if(player_1->inner[1]!=tmp) {
+						player_1->give(player_1->inner[1]);
+						player_1->inner[1] = tmp;
+					}
+					else if(player_1->inner[2]!=tmp) {
+						player_1->give(player_1->inner[2]);
+						player_1->inner[2] = tmp;
+					}
+					else if(player_1->inner[3]!=tmp) {
+						player_1->give(player_1->inner[3]);
+						player_1->inner[3] = tmp;
+					}
+				}
+					
+
+			}
 			if(inv_x < 0) inv_x = 7;
 			if(inv_x > 7) inv_x = 0;
 			if(inv_y < 0) inv_y = 5;
@@ -376,6 +500,16 @@ int main(){
                 }
             }
         }
+
+		for(int i = 0; i < num_of_objects; i++){
+            if(monsters_list[i]){
+                if(abs(player_1->get_x()-objects_list[i]->get_x())+abs(player_1->get_y()-objects_list[i]->get_y()) < 40*30){
+                    objects_tex[objects_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+objects_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ objects_list[i]->get_x()+ (-cx+10)*30);
+                    window.draw(*objects_tex[monsters_list[i]->get_type()-1]);
+                }
+            }
+		}
+
 		for(int i = 0; i < num_of_monsters; i++){
             if(monsters_list[i]){
                 if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
@@ -393,18 +527,33 @@ int main(){
 			window.draw(inv_bord);
 			inv_bord.setPosition(55+125+210-2, 40);
 			window.draw(inv_bord);
+			int ind = -1;
+			for(int i = 0; i < num_of_objects; i++){
+				if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;				
+			}
 			for(int i = 0; i < 48; i++){
 				inv_item.setPosition(55+130+(i%6)*70, 40+40+(i/6)*70);
+				if(i%6 < 3 && player_1->inner[(i/6)*3+i%6+4]) inv_item.setFillColor(Color(90, 90, 90));
+				if(ind >= 0 && i%6 >= 3 && objects_list[ind]->inner[(i/6)*3+i%6-3]) inv_item.setFillColor(Color(90, 90, 90));
 				window.draw(inv_item);
+				inv_item.setFillColor(Color(0, 0, 0));
 			}
+			if(player_1->inner[0]) inv_item.setFillColor(Color(90, 90, 90));
 			inv_item.setPosition(55+15, 40+40+40);
 			window.draw(inv_item);
+			inv_item.setFillColor(Color(0, 0, 0));
+			if(player_1->inner[1]) inv_item.setFillColor(Color(90, 90, 90));
 			inv_item.setPosition(55+15, 40+40+40+140);
 			window.draw(inv_item);
+			inv_item.setFillColor(Color(0, 0, 0));
+			if(player_1->inner[2]) inv_item.setFillColor(Color(90, 90, 90));
 			inv_item.setPosition(55+15, 40+40+40+280);
 			window.draw(inv_item);
+			inv_item.setFillColor(Color(0, 0, 0));
+			if(player_1->inner[3]) inv_item.setFillColor(Color(90, 90, 90));
 			inv_item.setPosition(55+15, 40+40+40+280+140);
 			window.draw(inv_item);
+			inv_item.setFillColor(Color(0, 0, 0));
 			
 
 		}
