@@ -10,10 +10,38 @@ using namespace sf;
 
 class item{
 protected:
-    int boost_damage, boost_armor, boost_hp, use_before_break, time_of_active;
     int x0, y0, x1, y1; //texture rect for menue
     char* name;
 public:
+	int boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist,  type, number, cost;
+	item(int damage, int armor, int hp, int speed, int atack_speed, int dist,  int t, int c, int sx, int sy, int tx0, int ty0){
+		boost_damage = damage;
+		boost_armor = armor;
+		boost_hp = hp;
+		boost_speed = speed;
+		boost_atack_speed = atack_speed;
+		boost_dist = dist;
+		type = t;
+		cost = c;
+		this->x1 = 0;
+        this->y1 = 0;
+        this->x0 = 60;
+        this->y0 = 60;
+	}
+	item(){
+		boost_damage = 0;
+		boost_armor = 0;
+		boost_hp = 0;
+		boost_speed = 0;
+		boost_atack_speed = 0;
+		boost_dist = 0;
+		type = 0;
+		cost = 0;
+		this->x1 = 0;
+        this->y1 = 0;
+        this->x0 = 60;
+        this->y0 = 60;
+	}
     //virtual void use_item() = 0;
 };
 
@@ -47,10 +75,10 @@ public:
         this->y = y0;
     }
     int get_centre_x() {
-        return x + (this->x1 - this->x0) / 2;
+        return x + abs(this->x1 - this->x0) / 2;
     }
     int get_centre_y() {
-        return y + (this->y1 - this->y0) / 2;
+        return y + abs(this->y1 - this->y0) / 2;
     }
 
 
@@ -79,15 +107,10 @@ public:
 
 
 
-
-class effect: public item{
-    virtual void use(/*monster* m*/); //i dont know how to do it
-};
-
 class monster: public object{
 protected:
     int hp, armor, damage, speed;
-    effect* effects;    //because we have this
+
     item* inner;
 public:
     monster():object(0,0,0,0){};
@@ -105,86 +128,127 @@ public:
 
 class player: public object{
 protected:
-    int hp, armor, damage, speed;
-    effect* effects;    //because we have this
-    
-	int num_of_items;
+    int hp, armor, damage, speed, time_atack, dist_atack;
+	int num_of_items, gold;
     bool attack;
 public:
-	item** inner;
-    std::chrono::time_point<std::chrono::system_clock> last_hit;
-    player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
-		x = x0;
-		y = y0;
-		speed = 1;
-		damage = 1;
-		inner = new item*[28];
-		num_of_items = 0;
-		for(int i = 0; i < 28; i++) inner[i] = NULL;
-    }
-    bool get_attack() {
-        return attack;
-    }
-    int get_damage() {
-        return this->damage;
-    }
-
-    bool give(item* it){
-		if(num_of_items == 24||it==NULL) return 0;
-		inner[num_of_items+4] = it;
-		num_of_items++;
-		return 1;	
-	}
-    item* take(int i){
-		if(i >= num_of_items) return NULL;
-		item* res = inner[i+4];
-		for(int j = i+4; j < num_of_items+3; j++) inner[j] = inner[j+1];
-		inner[num_of_items+3] = NULL;
-		num_of_items--;
-		return res;	
-	}
-
-    void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
-	if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
-	if(Keyboard::isKeyPressed(Keyboard::S) && (x+25 + speed < q*30-30) && (level[y/30+1][(x+25+speed)/30+1] > 0) && (level[(y+10)/30+1][(x+25 + speed)/30+1] > 0)) x += speed;
-	if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+25)/30+1] > 0) ) y -= speed;
-	if(Keyboard::isKeyPressed(Keyboard::D) && (y+10+speed < p*30-30) && (level[(y+10+speed)/30+1][x/30+1] > 0) && (level[(y+10+speed)/30+1][(x+25)/30+1] > 0)) y += speed;
-    if(Keyboard::isKeyPressed(Keyboard::Q)) attack = true;
-	if(Keyboard::isKeyPressed(Keyboard::Q) == false) attack = false;
-
-	for(int i = 0; i < n; i++){
-		if(monsters_list[i] != NULL && monsters_list[i]->get_collision()){
-			while((x+25 >= monsters_list[i]->get_x())&&(x+25<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
-					&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
-			while((x >= monsters_list[i]->get_centre_x())&&(x<=2*monsters_list[i]->get_centre_x()-monsters_list[i]->get_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
-					&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
-			while((y+10 >= monsters_list[i]->get_y())&&(y+10<=monsters_list[i]->get_centre_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
-					&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
-			while((y >= monsters_list[i]->get_centre_y())&&(y<=2*monsters_list[i]->get_centre_y()-monsters_list[i]->get_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
-					&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+		item** inner;
+		std::chrono::time_point<std::chrono::system_clock> last_hit;
+		std::chrono::time_point<std::chrono::system_clock> last_dist_hit;
+		player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
+			x = x0;
+			y = y0;
+			speed = 1;
+			damage = 1;
+			armor = 0;
+			gold = 0;
+			dist_atack = 25;
+			inner = new item*[28];
+			num_of_items = 0;
+			time_atack = 3000;
+			for(int i = 0; i < 28; i++) inner[i] = NULL;
 		}
-	}
-	for(int i = 0; i < no; i++){
-		if(objects_list[i] != NULL && objects_list[i]->get_collision()){
-			while((x+25 >= objects_list[i]->get_x())&&(x+25<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
-					&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
-			while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
-					&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
-			while((y+10 >= objects_list[i]->get_y())&&(y+10<=objects_list[i]->get_centre_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
-					&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
-			while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
-					&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+		bool get_attack() {
+			return attack;
 		}
-	}			//collision does not work  
+		int get_damage() {
+			return this->damage;
+		}
+
+		bool can_atack_dist(){
+			if(inner[2]==NULL) return 0;
+			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_dist_hit).count() >= inner[2]->boost_atack_speed;
+		}
+
+		bool give(item* it){
+			if(num_of_items == 24||it==NULL) return 0;
+			if(it->type == 5){
+				gold += it->cost;
+				return 1;
+			}
+			inner[num_of_items+4] = it;
+			num_of_items++;
+			return 1;	
+		}
+		item* take(int i){
+			if(i >= num_of_items) return NULL;
+			item* res = inner[i+4];
+			for(int j = i+4; j < num_of_items+3; j++) inner[j] = inner[j+1];
+			inner[num_of_items+3] = NULL;
+			num_of_items--;
+			return res;	
+		}
+
+		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
+		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
+		if(Keyboard::isKeyPressed(Keyboard::S) && (x+25 + speed < q*30-30) && (level[y/30+1][(x+25+speed)/30+1] > 0) && (level[(y+10)/30+1][(x+25 + speed)/30+1] > 0)) x += speed;
+		if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+25)/30+1] > 0) ) y -= speed;
+		if(Keyboard::isKeyPressed(Keyboard::D) && (y+10+speed < p*30-30) && (level[(y+10+speed)/30+1][x/30+1] > 0) && (level[(y+10+speed)/30+1][(x+25)/30+1] > 0)) y += speed;
+		if(Keyboard::isKeyPressed(Keyboard::Q)) attack = true;
+		if(Keyboard::isKeyPressed(Keyboard::Q) == false) attack = false;
+		if(Keyboard::isKeyPressed(Keyboard::E)){
+			if(inner[2]){
+				int ind = -1;
+				float mi = 10000000;
+				for(int i = 0; i < n; i++){
+					if(monsters_list[i]){
+						float ro = sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2));
+						if(ro<mi){
+							mi = ro;
+							ind = i;
+						}
+
+					}
+				}
+				auto time_dist_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_dist_hit).count();
+				if(ind >= 0 && mi<= inner[2]->boost_dist && time_dist_delta >= inner[2]->boost_atack_speed){
+					//monsters_list[ind]->damaged(inner[2]->boost_damage);
+					last_dist_hit = std::chrono::system_clock::now();
+				}
+			}
+		}
+		for(int i = 0; i<2; i++){
+			if(inner[i]){
+				speed += inner[i]->boost_speed;
+				damage += inner[i]->boost_damage;
+				time_atack -= inner[i]->boost_atack_speed;
+				armor += inner[i]->boost_armor;
+				dist_atack += inner[i]->boost_dist;
+			}
+		}
+		for(int i = 0; i < n; i++){
+			if(monsters_list[i] != NULL && monsters_list[i]->get_collision()){
+				while((x+25 >= monsters_list[i]->get_x())&&(x+25<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
+						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
+				while((x >= monsters_list[i]->get_centre_x())&&(x<=2*monsters_list[i]->get_centre_x()-monsters_list[i]->get_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
+						&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
+				while((y+10 >= monsters_list[i]->get_y())&&(y+10<=monsters_list[i]->get_centre_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
+						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
+				while((y >= monsters_list[i]->get_centre_y())&&(y<=2*monsters_list[i]->get_centre_y()-monsters_list[i]->get_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
+						&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+			}
+		}
+		for(int i = 0; i < no; i++){
+			if((objects_list[i] != NULL) && objects_list[i]->get_collision()){ 
+				while((x+25 >= objects_list[i]->get_x())&&(x+25<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
+						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
+				while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
+						&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
+				while((y+10 >= objects_list[i]->get_y())&&(y+10<=objects_list[i]->get_centre_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
+						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
+				while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
+						&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+			}
+		}			
 
 
-    for(int i = 0; i < n; i++) {
+    	for(int i = 0; i < n; i++) {
             if (monsters_list[i] != NULL) {
                 // player damages kills monsters
                 // attack works for center of monster and player
                 auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
-                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < 25)) {
-                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > 3000) {
+                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < dist_atack)) {
+                    if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > time_atack) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
                             monsters_list[i]->set_hp(-1 * this->get_damage());
                             std::cout << "time delta: " << time_delta << std::endl;
@@ -199,7 +263,12 @@ public:
                 }
             }
         }
-    } 
+		speed = 1;
+		damage = 1;
+		armor = 0;
+		time_atack = 3000;
+		dist_atack = 25;
+    }
 };
 
 
@@ -214,7 +283,6 @@ public:
 		n = 0;
 		inner = new item*[24];
 		set_pos(x, y);
-		collision = true;
 	}
 };
 
@@ -270,7 +338,7 @@ public:
     soyjak_typical(int xp, int yp, int rad, bool x_dir){
 		this-> x_direction = x_dir;
         this->hp = 6;
-        this->armor = 3;
+        this->armor = 0;
         this->damage = 2;
         this->speed = 1;
         this->xp = xp;
@@ -285,10 +353,6 @@ public:
 		collision = true;
     }
 
-    ~soyjak_typical() {
-        delete[] inner;
-		delete[] effects;
-    }
 
     void behavior() {
         // walking (now exists only on x-axis)
@@ -383,6 +447,8 @@ int main(){
 		// here is creating new objects from file
 	}
 
+	bool dist_atacked = false;
+	int n_iter_drawing = 1000, ind_of_aim;
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
@@ -411,7 +477,7 @@ int main(){
 	inv_bord.setFillColor(Color(70, 70, 70));
 
 
-	objects_list[0]->give(new item);
+	objects_list[0]->give(new item(1000, 1000, 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000));
 
 	int cx = 0, cy= 0;
     player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
@@ -424,10 +490,10 @@ int main(){
     {
 		auto start = std::chrono::system_clock::now();
 		//all actions of player, monsters, and others
-		if(Keyboard::isKeyPressed(Keyboard::R)){
+		if(Keyboard::isKeyPressed(Keyboard::F)){
 			if(inv_open) inv_open = false;
 			else inv_open = true;
-			while (Keyboard::isKeyPressed(Keyboard::R)) continue; //not good, but I do not see other ways
+			while (Keyboard::isKeyPressed(Keyboard::F)) continue; //not good, but I do not see other ways
 			inv_x = 0;
 			inv_y = 0;
 		}
@@ -456,21 +522,27 @@ int main(){
 			if(Keyboard::isKeyPressed(Keyboard::E)){
 				if(inv_y < 3){
 					item* tmp = player_1->take(inv_x*3+inv_y);
-					if(player_1->inner[0]!=tmp) {
-						player_1->give(player_1->inner[0]);
-						player_1->inner[0] = tmp;
+					if(tmp == NULL){
+						if(player_1->inner[0]!=tmp) {
+							player_1->give(player_1->inner[0]);
+							player_1->inner[0] = tmp;
+						}
+						else if(player_1->inner[1]!=tmp) {
+							player_1->give(player_1->inner[1]);
+							player_1->inner[1] = tmp;
+						}
+						else if(player_1->inner[2]!=tmp) {
+							player_1->give(player_1->inner[2]);
+							player_1->inner[2] = tmp;
+						}
+						else if(player_1->inner[3]!=tmp) {
+							player_1->give(player_1->inner[3]);
+							player_1->inner[3] = tmp;
+						}
 					}
-					else if(player_1->inner[1]!=tmp) {
-						player_1->give(player_1->inner[1]);
-						player_1->inner[1] = tmp;
-					}
-					else if(player_1->inner[2]!=tmp) {
-						player_1->give(player_1->inner[2]);
-						player_1->inner[2] = tmp;
-					}
-					else if(player_1->inner[3]!=tmp) {
-						player_1->give(player_1->inner[3]);
-						player_1->inner[3] = tmp;
+					else{
+						player_1->give(player_1->inner[tmp->type]);
+						player_1->inner[tmp->type] = tmp;
 					}
 				}
 					
@@ -517,6 +589,38 @@ int main(){
                     window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
                 }
             }
+		}
+		
+		CircleShape aim(5.f);
+		//std::cout << (player_1->can_atack_dist()) << std::endl;
+		if(player_1->can_atack_dist() || n_iter_drawing < 100||dist_atacked){
+			if(dist_atacked == true && player_1->can_atack_dist() == false) n_iter_drawing = 80;
+			dist_atacked = player_1->can_atack_dist();
+			int ind = -1;
+			float mi = 10000000;
+			for(int i = 0; i < num_of_monsters; i++){
+				if(monsters_list[i]){
+					float ro = sqrt(pow(monsters_list[i]->get_centre_x() - player_1->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - player_1->get_centre_y(), 2));
+					if(ro<mi){
+						mi = ro;
+						ind = i;
+					}
+
+				}
+			}
+			if(ind >= 0){
+				
+				if(n_iter_drawing < 100){
+					n_iter_drawing+=1;
+					aim.setFillColor(Color(250, 0, 0));
+				}else ind_of_aim = ind;
+				if(monsters_list[ind_of_aim]!=NULL){
+					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(-cy+10)*30-5,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (-cx+10)*30-5);
+					window.draw(aim);
+				}
+				
+				aim.setFillColor(Color(0, 128, 0));
+			}
 		}
 	    window.draw(play);
 		if(inv_open){
