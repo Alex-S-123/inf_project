@@ -4,7 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <vector>
-                               
+
 using namespace sf;
 
 
@@ -53,7 +53,7 @@ protected:
 	int type;
 	bool collision;
 	int n;
-    
+
 public:
 	item** inner;
     object(int sx, int sy, int tx0, int ty0){
@@ -91,7 +91,7 @@ public:
 		if(n == 24||it==NULL) return 0;
 		inner[n] = it;
 		n++;
-		return 1;	
+		return 1;
 	}
     item* take(int i){
 		if(i > n) return NULL;
@@ -99,13 +99,13 @@ public:
 		for(int j = i; j < n-1; j++) inner[j] = inner[j+1];
 		inner[n-1] = NULL;
 		n--;
-		return res;	
+		return res;
 	}
-	
+
 
 };
 
-
+class player;
 
 class monster: public object{
 protected:
@@ -123,7 +123,7 @@ public:
     void set_hp(int delta_hp) {
         this->hp += delta_hp;
     }
-    virtual void behavior(){};
+    virtual void behavior(player *p){};
 };
 
 class player: public object{
@@ -135,7 +135,8 @@ public:
 		item** inner;
 		std::chrono::time_point<std::chrono::system_clock> last_hit;
 		std::chrono::time_point<std::chrono::system_clock> last_dist_hit;
-		player(int sx, int sy, int tx0, int ty0, int x0, int y0) : object(sx, sy, tx0, ty0){
+		bool dead;
+		player(int sx, int sy, int tx0, int ty0, int x0, int y0, int health) : object(sx, sy, tx0, ty0){
 			x = x0;
 			y = y0;
 			speed = 1;
@@ -146,8 +147,12 @@ public:
 			inner = new item*[28];
 			num_of_items = 0;
 			time_atack = 3000;
+			hp = health;
 			for(int i = 0; i < 28; i++) inner[i] = NULL;
 		}
+		int get_hp() {
+            return this->hp;
+        }
 		bool get_attack() {
 			return attack;
 		}
@@ -168,7 +173,7 @@ public:
 			}
 			inner[num_of_items+4] = it;
 			num_of_items++;
-			return 1;	
+			return 1;
 		}
 		item* take(int i){
 			if(i >= num_of_items) return NULL;
@@ -176,8 +181,19 @@ public:
 			for(int j = i+4; j < num_of_items+3; j++) inner[j] = inner[j+1];
 			inner[num_of_items+3] = NULL;
 			num_of_items--;
-			return res;	
+			return res;
 		}
+
+		void damaged(int damag) {
+        //this->hp -= std::max(0, abs(this->armor - hp));
+            if (this->armor < damag) {
+                this->hp -= (damag - this->armor);
+                if (this->hp <= 0) {
+                    std::cout << "death" << std::endl;
+                    //this->~player();
+                }
+            }
+        }
 
 		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
 		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
@@ -229,7 +245,7 @@ public:
 			}
 		}
 		for(int i = 0; i < no; i++){
-			if((objects_list[i] != NULL) && objects_list[i]->get_collision()){ 
+			if((objects_list[i] != NULL) && objects_list[i]->get_collision()){
 				while((x+25 >= objects_list[i]->get_x())&&(x+25<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
 						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
 				while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
@@ -239,7 +255,7 @@ public:
 				while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
 						&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
 			}
-		}			
+		}
 
 
     	for(int i = 0; i < n; i++) {
@@ -275,7 +291,7 @@ public:
 class treasure: public object{
 protected:
     int n;
-    
+
 public:
 	item** inner;
     treasure(int x, int y):object(0, 0, 15, 15){
@@ -333,8 +349,13 @@ protected:
     int walking_radius; // max radius from the point (x0; y0)
     int attack_radius; // if player is closer than this radius, monster attacks
     bool right_direction, x_direction;
+    bool damaged_player;
+    int attack_period;
+    int wait_time;
     //need texture size!
 public:
+    bool is_attacking;
+    std::chrono::time_point<std::chrono::system_clock> last_hit;
     soyjak_typical(int xp, int yp, int rad, bool x_dir){
 		this-> x_direction = x_dir;
         this->hp = 6;
@@ -344,17 +365,21 @@ public:
         this->xp = xp;
         this->yp = yp;
         this->walking_radius = rad;
-        this->attack_radius = 5;
+        this->attack_radius = 30;
         this->right_direction = true;
+        this->attack_period = 4000;
 		this->type = 1;
 		this->set_pos(xp, yp);
 		y1 = 15;
 		x1 = 30;
 		collision = true;
+		this->is_attacking = false;
+		this->damaged_player = false;
     }
 
 
-    void behavior() {
+    void behavior(player *p) {
+        //std::cout<<"behave"<<std::endl;
         // walking (now exists only on x-axis)
 		if(this->x_direction){
 		    if (this->right_direction) {
@@ -387,10 +412,30 @@ public:
 		    }
 
 		}
-        // attack (attacks only on x-axis)
-        //if (pow(pow(player.get_x() - this->x, 2) + pow(player.get_y() - this->y, 2), 1/2)) {
-            // change of image to attacking image
-        //}
+
+        // attack
+        if ((p->dead==0)&&(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() < 500) && (this->is_attacking == 1)) {
+            //std::cout << "IN PROCESS" << std::endl;
+            if ((sqrt(pow(p->get_x() - this->x + this->get_centre_x() - p->get_centre_x(), 2) + pow(p->get_y() - this->y + this->get_centre_y() - p->get_centre_y(), 2)) <= this->attack_radius) && (this->damaged_player == false)) {
+                this->last_hit = std::chrono::system_clock::now();
+                std::cout << "player damaged " << p->get_hp() << std::endl;
+                if (p->get_hp() == false) {
+                    p->dead = true;
+                }
+                this->damaged_player = true;
+                p->damaged(1);
+            }
+        }
+        if ((std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() >= 500) && (this->is_attacking == true)) {
+            this->is_attacking = false;
+        }
+        if ((std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() >= this->attack_period) && (this->is_attacking == false)) {
+            if (this->is_attacking == false) {
+                this->is_attacking = true;
+                this->damaged_player = false;
+                this->last_hit = std::chrono::system_clock::now();
+            }
+        }
     }
 };
 
@@ -468,7 +513,7 @@ int main(){
 
 	RectangleShape inv_back(Vector2f(550, 600));
 	inv_back.setFillColor(Color(139, 69, 19));
-	inv_back.setPosition(55, 40);	
+	inv_back.setPosition(55, 40);
 	RectangleShape inv_item(Vector2f(60, 60));
 	inv_item.setFillColor(Color(0, 0, 0));
 	RectangleShape inv_ch(Vector2f(70, 70));
@@ -480,7 +525,7 @@ int main(){
 	objects_list[0]->give(new item(1000, 1000, 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000));
 
 	int cx = 0, cy= 0;
-    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy);
+    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy, 5);
 
     VideoMode vid;
 	vid.width = 30*(n+2);
@@ -498,9 +543,9 @@ int main(){
 			inv_y = 0;
 		}
 		for(int i = 0; i < num_of_monsters; i++){
-				if(monsters_list[i])monsters_list[i]->behavior();
+				if(monsters_list[i])monsters_list[i]->behavior(player_1);
 			}
-		if(!inv_open)player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
+		if((!inv_open) && (player_1->dead == 0))player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
 		else{
 			if(Keyboard::isKeyPressed(Keyboard::W)) inv_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) inv_x += 1;
@@ -510,7 +555,7 @@ int main(){
 				int ind = -1;
 				//std::cout << abs(player_1->get_centre_x()-objects_list[0]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[0]->get_centre_y()) << std::endl;
 				for(int i = 0; i < num_of_objects; i++){
-					if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;				
+					if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;
 				}
 				if(ind>=0){
 					//std::cout << 1 << std::endl;
@@ -545,7 +590,7 @@ int main(){
 						player_1->inner[tmp->type] = tmp;
 					}
 				}
-					
+
 
 			}
 			if(inv_x < 0) inv_x = 7;
@@ -590,7 +635,7 @@ int main(){
                 }
             }
 		}
-		
+
 		CircleShape aim(5.f);
 		//std::cout << (player_1->can_atack_dist()) << std::endl;
 		if(player_1->can_atack_dist() || n_iter_drawing < 100||dist_atacked){
@@ -609,7 +654,7 @@ int main(){
 				}
 			}
 			if(ind >= 0){
-				
+
 				if(n_iter_drawing < 100){
 					n_iter_drawing+=1;
 					aim.setFillColor(Color(250, 0, 0));
@@ -618,11 +663,13 @@ int main(){
 					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(-cy+10)*30-5,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (-cx+10)*30-5);
 					window.draw(aim);
 				}
-				
+
 				aim.setFillColor(Color(0, 128, 0));
 			}
 		}
-	    window.draw(play);
+		if (player_1->dead == 0) {
+            window.draw(play);
+		}
 		if(inv_open){
 			window.draw(inv_back);
 			inv_ch.setPosition(55+130+inv_y*70-5, 40+40+inv_x*70-5);
@@ -633,7 +680,7 @@ int main(){
 			window.draw(inv_bord);
 			int ind = -1;
 			for(int i = 0; i < num_of_objects; i++){
-				if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;				
+				if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;
 			}
 			for(int i = 0; i < 48; i++){
 				inv_item.setPosition(55+130+(i%6)*70, 40+40+(i/6)*70);
@@ -658,8 +705,6 @@ int main(){
 			inv_item.setPosition(55+15, 40+40+40+280+140);
 			window.draw(inv_item);
 			inv_item.setFillColor(Color(0, 0, 0));
-			
-
 		}
         window.display();
 		while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
