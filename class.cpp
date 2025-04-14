@@ -52,33 +52,36 @@ protected:
     int x0, y0, x1, y1; //texture rect
 	int type;
 	bool collision;
-	int n;
+	//int n;
 
 public:
 	item** inner;
     object(int sx, int sy, int tx0, int ty0){
         this->x = 0;
         this->y = 0;
-        this->x1 = sx;
-        this->y1 = sy;
-        this->x0 = tx0;
-        this->y0 = ty0;
+        this->x0 = sx;
+        this->y0 = sy;
+        this->x1 = tx0;
+        this->y1 = ty0;
 		type = 0;
 		inner = new item*[24];
 		for(int i = 0; i < 24; i++) inner[i] = NULL;
-		n = 0;
 		collision = false;
     }
+
+	IntRect tex_rect(){
+		return IntRect(x0, y0, x1-x0, y1-y0);
+	}
 
     void set_pos(float x0, float y0){
         this->x = x0;
         this->y = y0;
     }
     int get_centre_x() {
-        return x + abs(this->x1 - this->x0) / 2;
+        return x + abs(this->y1 - this->y0) / 2;
     }
     int get_centre_y() {
-        return y + abs(this->y1 - this->y0) / 2;
+        return y + abs(this->x1 - this->x0) / 2;
     }
 
 
@@ -87,22 +90,10 @@ public:
     int get_y() {return this->y;}
 	int get_type() {return type; }
 	bool get_collision() {return collision;}
-	bool give(item* it){
-		if(n == 24||it==NULL) return 0;
-		inner[n] = it;
-		n++;
-		return 1;
-	}
-    item* take(int i){
-		if(i > n) return NULL;
-		item* res = inner[i];
-		for(int j = i; j < n-1; j++) inner[j] = inner[j+1];
-		inner[n-1] = NULL;
-		n--;
-		return res;
-	}
 
 
+	virtual bool give(item* it){}
+	virtual item* take(int i){}
 };
 
 class player;
@@ -110,9 +101,12 @@ class player;
 class monster: public object{
 protected:
     int hp, armor, damage, speed;
-    item* inner;
+	int frames_of_walk;//, frames_after_atack;
+
+    //item* inner;
 public:
     monster():object(0,0,0,0){};
+    void damaged(int damag);
     int atack();
     int get_type(){return this->type;}
     int get_hp() {
@@ -128,7 +122,9 @@ class player: public object{
 protected:
     int hp, armor, damage, speed, time_atack, dist_atack;
 	int num_of_items, gold;
-    bool attack;
+    bool attack, r_dir, is_walking;
+	int frames_after_atack, frames_of_walk;
+	int xsize, ysize;
 public:
 		item** inner;
 		std::chrono::time_point<std::chrono::system_clock> last_hit;
@@ -146,6 +142,12 @@ public:
 			num_of_items = 0;
 			time_atack = 3000;
 			hp = health;
+			frames_after_atack = 20;
+			frames_of_walk = 0;
+			r_dir = false;
+			is_walking = false;
+			xsize = 36;
+			ysize = 20;
 			for(int i = 0; i < 28; i++) inner[i] = NULL;
 		}
 		int get_hp() {
@@ -194,10 +196,10 @@ public:
         }
 
 		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
-		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+10)/30+1][(x-speed)/30+1] > 0)) x -= speed;
-		if(Keyboard::isKeyPressed(Keyboard::S) && (x+25 + speed < q*30-30) && (level[y/30+1][(x+25+speed)/30+1] > 0) && (level[(y+10)/30+1][(x+25 + speed)/30+1] > 0)) x += speed;
-		if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+25)/30+1] > 0) ) y -= speed;
-		if(Keyboard::isKeyPressed(Keyboard::D) && (y+10+speed < p*30-30) && (level[(y+10+speed)/30+1][x/30+1] > 0) && (level[(y+10+speed)/30+1][(x+25)/30+1] > 0)) y += speed;
+		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+ysize)/30+1][(x-speed)/30+1] > 0)) {x -= speed; r_dir = true; is_walking = true; frames_of_walk++;}
+		if(Keyboard::isKeyPressed(Keyboard::S) && (x+xsize + speed < q*30-30) && (level[y/30+1][(x+xsize+speed)/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize + speed)/30+1] > 0)) {x += speed; r_dir = false; is_walking = true; frames_of_walk++;}
+		if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+xsize)/30+1] > 0) )  {y -= speed; r_dir = false; is_walking = true;frames_of_walk++;}
+		if(Keyboard::isKeyPressed(Keyboard::D) && (y+ysize+speed < p*30-30) && (level[(y+ysize+speed)/30+1][x/30+1] > 0) && (level[(y+ysize+speed)/30+1][(x+xsize)/30+1] > 0))  {y += speed; r_dir = true; is_walking = true;frames_of_walk++;}
 		if(Keyboard::isKeyPressed(Keyboard::Q)) attack = true;
 		if(Keyboard::isKeyPressed(Keyboard::Q) == false) attack = false;
 		if(Keyboard::isKeyPressed(Keyboard::E)){
@@ -217,6 +219,14 @@ public:
 				auto time_dist_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_dist_hit).count();
 				if(ind >= 0 && mi<= inner[2]->boost_dist && time_dist_delta >= inner[2]->boost_atack_speed){
 					//monsters_list[ind]->damaged(inner[2]->boost_damage);
+					if (monsters_list[ind]->get_hp() - inner[2]->boost_damage > 0) {
+						monsters_list[ind]->set_hp(-1 * inner[2]->boost_damage);
+						std::cout << "time delta: " << time_dist_delta << std::endl;
+						std::cout << "monster damaged, monster's hp: " << monsters_list[ind]->get_hp() << std::endl;
+					} else {
+						monsters_list[ind] = NULL;
+						std::cout << "monster killed!" << std::endl;
+					}
 					last_dist_hit = std::chrono::system_clock::now();
 				}
 			}
@@ -232,29 +242,30 @@ public:
 		}
 		for(int i = 0; i < n; i++){
 			if(monsters_list[i] != NULL && monsters_list[i]->get_collision()){
-				while((x+25 >= monsters_list[i]->get_x())&&(x+25<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
-						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
-				while((x >= monsters_list[i]->get_centre_x())&&(x<=2*monsters_list[i]->get_centre_x()-monsters_list[i]->get_x())&&(y<=monsters_list[i]->get_centre_y()&&y+10>=monsters_list[i]->get_centre_y())
-						&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
-				while((y+10 >= monsters_list[i]->get_y())&&(y+10<=monsters_list[i]->get_centre_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
-						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
-				while((y >= monsters_list[i]->get_centre_y())&&(y<=2*monsters_list[i]->get_centre_y()-monsters_list[i]->get_y())&&(x<=monsters_list[i]->get_centre_x()&&x+25>=monsters_list[i]->get_centre_x())
-						&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
-			}
-		}
-		for(int i = 0; i < no; i++){
-			if((objects_list[i] != NULL) && objects_list[i]->get_collision()){
-				while((x+25 >= objects_list[i]->get_x())&&(x+25<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
-						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+10)/30+1][(x-1)/30+1] > 0)) x-= 1;
-				while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+10>=objects_list[i]->get_centre_y())
-						&& (x+26 < q*30-30) && (level[y/30+1][(x+26)/30+1] > 0) && (level[(y+10)/30+1][(x+26)/30+1] > 0)) x+= 1;
-				while((y+10 >= objects_list[i]->get_y())&&(y+10<=objects_list[i]->get_centre_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
-						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+25)/30+1] > 0)) y-= 1;
-				while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+25>=objects_list[i]->get_centre_x())
-						&& (y+11 < p*30-30) && (level[(y+11)/30+1][x/30+1] > 0) && (level[(y+11)/30+1][(x+25)/30+1] > 0)) y += 1;
+				while((x+xsize >= monsters_list[i]->get_x())&&(x+xsize<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+ysize>=monsters_list[i]->get_centre_y())
+						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+ysize)/30+1][(x-1)/30+1] > 0)) x-= 1;
+				while((x >= monsters_list[i]->get_centre_x())&&(x<=2*monsters_list[i]->get_centre_x()-monsters_list[i]->get_x())&&(y<=monsters_list[i]->get_centre_y()&&y+ysize>=monsters_list[i]->get_centre_y())
+						&& (x+xsize+1 < q*30-30) && (level[y/30+1][(x+xsize+1)/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize+1)/30+1] > 0)) x+= 1;
+				while((y+ysize >= monsters_list[i]->get_y())&&(y+ysize<=monsters_list[i]->get_centre_y())&&(x<=monsters_list[i]->get_centre_x()&&x+xsize>=monsters_list[i]->get_centre_x())
+						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+xsize)/30+1] > 0)) y-= 1;
+				while((y >= monsters_list[i]->get_centre_y())&&(y<=2*monsters_list[i]->get_centre_y()-monsters_list[i]->get_y())&&(x<=monsters_list[i]->get_centre_x()&&x+xsize>=monsters_list[i]->get_centre_x())
+						&& (y+ysize+1 < p*30-30) && (level[(y+ysize+1)/30+1][x/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize)/30+1] > 0)) y += 1;
 			}
 		}
 
+		for(int i = 0; i < no; i++){
+			if(objects_list[i] != NULL && objects_list[i]->get_collision()){
+				while((x+xsize >= objects_list[i]->get_x())&&(x+xsize<=objects_list[i]->get_centre_x())&&(y<=objects_list[i]->get_centre_y()&&y+ysize>=objects_list[i]->get_centre_y())
+						&& (x-1>0) && (level[y/30+1][(x-1)/30+1] > 0) && (level[(y+ysize)/30+1][(x-1)/30+1] > 0)) x-= 1;
+				while((x >= objects_list[i]->get_centre_x())&&(x<=2*objects_list[i]->get_centre_x()-objects_list[i]->get_x())&&(y<=objects_list[i]->get_centre_y()&&y+ysize>=objects_list[i]->get_centre_y())
+						&& (x+xsize+1 < q*30-30) && (level[y/30+1][(x+xsize+1)/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize+1)/30+1] > 0)) x+= 1;
+				while((y+ysize >= objects_list[i]->get_y())&&(y+ysize<=objects_list[i]->get_centre_y())&&(x<=objects_list[i]->get_centre_x()&&x+xsize>=objects_list[i]->get_centre_x())
+						&& (y-1 > 0) && (level[(y-1)/30+1][x/30+1] > 0) && (level[(y-1)/30+1][(x+xsize)/30+1] > 0)) y-= 1;
+				while((y >= objects_list[i]->get_centre_y())&&(y<=2*objects_list[i]->get_centre_y()-objects_list[i]->get_y())&&(x<=objects_list[i]->get_centre_x()&&x+xsize>=objects_list[i]->get_centre_x())
+						&& (y+ysize+1 < p*30-30) && (level[(y+ysize+1)/30+1][x/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize)/30+1] > 0)) y += 1;
+			}
+		}
+		if(attack&&std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count()>time_atack) frames_after_atack = 0;
 
     	for(int i = 0; i < n; i++) {
             if (monsters_list[i] != NULL) {
@@ -264,7 +275,6 @@ public:
                 if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < dist_atack)) {
                     if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > time_atack) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
-                            //monsters_list[i]->set_hp(-1 * this->get_damage());
                             monsters_list[i]->set_hp(-1 * this->get_damage());
                             std::cout << "time delta: " << time_delta << std::endl;
                             std::cout << "monster damaged, monster's hp: " << monsters_list[i]->get_hp() << std::endl;
@@ -273,30 +283,85 @@ public:
                             monsters_list[i] = NULL;
                             std::cout << "monster killed!" << std::endl;
                         }
-                        //play.setFillColor(Color(0, 0, 150));
                     }
                 }
             }
         }
 		speed = 1;
 		damage = 1;
-		armor = 0;
+		armor = 5;
 		time_atack = 3000;
 		dist_atack = 25;
+
+
+		if(frames_after_atack < 20){
+			frames_after_atack ++;
+			if(r_dir){
+				x0 = 0;
+				y0 = 108;
+				x1 = 20;
+				y1 = 144;
+			}
+			else{
+				x0 = 20;
+				y0 = 108;
+				x1 = 0;
+				y1 = 144;
+			}
+		}
+		else{
+			if(is_walking == false){
+				x0 = 0;
+				y0 = 0;
+				x1 = 20;
+				y1 = 36;
+			}
+			else if(r_dir){
+				x0 = 0;
+				y0 = 36+(frames_of_walk%20/10)*36;
+				x1 = 20;
+				y1 = 72+(frames_of_walk%20/10)*36;
+			}
+			else{
+				x0 = 20;
+				y0 = 36+(frames_of_walk%20/10)*36;
+				x1 = 0;
+				y1 = 72+(frames_of_walk%20/10)*36;
+			}
+		}
+
+
+		frames_of_walk = frames_of_walk%20;
+		is_walking = false;
     }
 };
+
 
 class treasure: public object{
 protected:
     int n;
 
 public:
-	item** inner;
     treasure(int x, int y):object(0, 0, 15, 15){
 		type = 1;
 		n = 0;
-		inner = new item*[24];
+		//collision = true;
 		set_pos(x, y);
+	}
+
+	bool give(item* it){
+		if(n == 24||it==NULL) return 0;
+		inner[n] = it;
+		n++;
+		return 1;
+	}
+    item* take(int i){
+		if(i > n) return NULL;
+		item* res = inner[i];
+		for(int j = i; j < n-1; j++) inner[j] = inner[j+1];
+		inner[n-1] = NULL;
+		n--;
+		return res;
 	}
 };
 
@@ -353,8 +418,8 @@ protected:
     //need texture size!
 public:
     bool is_attacking;
-    std::chrono::time_point<std::chrono::system_clock> last_hit;
     int random_start;
+    std::chrono::time_point<std::chrono::system_clock> last_hit;
     soyjak_typical(int xp, int yp, int rad, bool x_dir){
 		this-> x_direction = x_dir;
         this->hp = 6;
@@ -364,31 +429,35 @@ public:
         this->xp = xp;
         this->yp = yp;
         this->walking_radius = rad;
-        this->attack_radius = 30;
+        this->attack_radius = 50;
         this->right_direction = true;
         this->attack_period = 4000;
 		this->type = 1;
 		this->set_pos(xp, yp);
-		y1 = 15;
-		x1 = 30;
+		y1 = 46;
+		x1 = 28;
 		collision = true;
 		this->is_attacking = false;
 		this->damaged_player = false;
+		frames_of_walk = 0;
 		this->random_start = rand() % (5000 - 2000 + 1) + 2000;
 		last_hit = std::chrono::system_clock::now();
     }
 
 
     void behavior(player *p) {
+        //std::cout<<"behave"<<std::endl;
+        // walking (now exists only on x-axis)
+		frames_of_walk = (frames_of_walk+1)%20;
 		if(this->x_direction){
 		    if (this->right_direction) {
-		        if (this->x <= this->x0 + walking_radius) {
+		        if (this->x <= this->xp + walking_radius) {
 		            this->x += this->speed;
 		        } else {
 		            this->right_direction = false;
 		        }
 		    } else {
-		        if (this->x >= this->x0 - walking_radius) {
+		        if (this->x >= this->xp - walking_radius) {
 		            this->x -= this->speed;
 		        } else {
 		            this->right_direction = true;
@@ -397,20 +466,24 @@ public:
 		}
 		else{
 			if (this->right_direction) {
-		        if (this->y <= this->y0 + walking_radius) {
+		        if (this->y <= this->yp + walking_radius) {
 		            this->y += this->speed;
 		        } else {
 		            this->right_direction = false;
 		        }
 		    } else {
-		        if (this->y >= this->y0 - walking_radius) {
+		        if (this->y >= this->yp - walking_radius) {
 		            this->y -= this->speed;
 		        } else {
 		            this->right_direction = true;
 		        }
 		    }
+
 		}
-        if ((p->dead==0)&&(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() < 500) && (this->is_attacking == 1)) {
+
+
+
+		if ((p->dead==0)&&(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() < 500) && (this->is_attacking == 1)) {
             if (
                 (pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) <= pow(this->attack_radius, 2))
                 && (this->damaged_player == false)
@@ -440,6 +513,35 @@ public:
                 this->last_hit = std::chrono::system_clock::now();
             }
         }
+
+		if(is_attacking){
+			if(right_direction){
+				x0 = 0;
+				y0 = 92;
+				x1 = 28;
+				y1 = 138;
+			}
+			else{
+				x0 = 28;
+				y0 = 92;
+				x1 = 0;
+				y1 = 138;
+			}
+		}
+		else{
+			if(right_direction){
+				x0 = 0;
+				y0 = 0+(frames_of_walk/10)*46;
+				x1 = 28;
+				y1 = 46+(frames_of_walk/10)*46;
+			}
+			else{
+				x0 = 28;
+				y0 = 0+(frames_of_walk/10)*46;
+				x1 = 0;
+				y1 = 46+(frames_of_walk/10)*46;
+			}
+		}
     }
 };
 
@@ -500,6 +602,7 @@ public:
     }
 };
 
+
 int main(){
 	std::ifstream f("field.txt");
 	bool inv_open = false;
@@ -557,8 +660,8 @@ int main(){
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
-	monsters_tex[0] = new RectangleShape(Vector2f(15, 30));
-	monsters_tex[0]->setFillColor(Color(128, 0, 0));
+	monsters_tex[0] = new RectangleShape(Vector2f(28, 46));
+	//monsters_tex[0]->setFillColor(Color(128, 0, 0));
 
 	int object_types = 1;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
@@ -566,9 +669,9 @@ int main(){
 	objects_tex[0]->setFillColor(Color(0, 128, 0));
 
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
-    field.setFillColor(Color(90, 90, 90));
-    RectangleShape play(Vector2f(10, 25));
-    play.setFillColor(Color(0, 0, 0));
+    //field.setFillColor(Color(90, 90, 90));
+    RectangleShape play(Vector2f(20, 36));
+    //play.setFillColor(Color(0, 0, 0));
     play.setPosition(330, 330);
 
 	RectangleShape inv_back(Vector2f(550, 600));
@@ -581,11 +684,27 @@ int main(){
 	RectangleShape inv_bord(Vector2f(5, 600));
 	inv_bord.setFillColor(Color(70, 70, 70));
 
-
+	//comment line after
 	objects_list[0]->give(new item(1000, 1000, 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000));
 
 	int cx = 0, cy= 0;
-    player* player_1 = new player(0,0,25,10, 30*cx, 30*cy, 5);
+    player* player_1 = new player(0,0,36,20, 30*cx, 30*cy, 5);
+
+
+	Texture field_tex;
+	field_tex.loadFromFile("terrain.png");
+	field.setTexture(&field_tex);
+
+	Texture player_tex;
+	player_tex.loadFromFile("player.png");
+	play.setTexture(&player_tex);
+	Texture** mons_te = new Texture*[monster_types];
+	mons_te[0] = new Texture;
+	mons_te[0]->loadFromFile("soyjak.png");
+	for(int i = 0; i < monster_types; i++){
+		monsters_tex[i]->setTexture(mons_te[i]);
+	}
+
 
     VideoMode vid;
 	vid.width = 30*(n+2);
@@ -650,6 +769,8 @@ int main(){
 						player_1->inner[tmp->type] = tmp;
 					}
 				}
+
+
 			}
 			if(inv_x < 0) inv_x = 7;
 			if(inv_x > 7) inv_x = 0;
@@ -671,16 +792,17 @@ int main(){
             for(int i = 0; i < p; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
                     field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
-                    window.draw(field);
+                    field.setTextureRect(IntRect(30*level[i][j]-30, 0, 30*level[i][j], 30));
+					window.draw(field);
                 }
             }
         }
 
 		for(int i = 0; i < num_of_objects; i++){
-            if(monsters_list[i]){
+            if(objects_list[i]){
                 if(abs(player_1->get_x()-objects_list[i]->get_x())+abs(player_1->get_y()-objects_list[i]->get_y()) < 40*30){
                     objects_tex[objects_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+objects_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ objects_list[i]->get_x()+ (-cx+10)*30);
-                    window.draw(*objects_tex[monsters_list[i]->get_type()-1]);
+                    window.draw(*objects_tex[objects_list[i]->get_type()-1]);
                 }
             }
 		}
@@ -689,7 +811,8 @@ int main(){
             if(monsters_list[i]){
                 if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
                     monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
-                    window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
+                    monsters_tex[monsters_list[i]->get_type()-1]->setTextureRect(monsters_list[i]->tex_rect());
+					window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
                 }
             }
 		}
@@ -708,9 +831,11 @@ int main(){
 						mi = ro;
 						ind = i;
 					}
+
 				}
 			}
 			if(ind >= 0){
+
 				if(n_iter_drawing < 100){
 					n_iter_drawing+=1;
 					aim.setFillColor(Color(250, 0, 0));
@@ -724,6 +849,7 @@ int main(){
 			}
 		}
 		if (player_1->dead == 0) {
+			play.setTextureRect(player_1->tex_rect());
             window.draw(play);
 		}
 		if(inv_open){
