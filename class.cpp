@@ -356,6 +356,7 @@ protected:
 public:
     bool is_attacking;
     std::chrono::time_point<std::chrono::system_clock> last_hit;
+    int random_start;
     soyjak_typical(int xp, int yp, int rad, bool x_dir){
 		this-> x_direction = x_dir;
         this->hp = 6;
@@ -375,12 +376,12 @@ public:
 		collision = true;
 		this->is_attacking = false;
 		this->damaged_player = false;
+		this->random_start = rand() % (5000 - 2000 + 1) + 2000;
+		last_hit = std::chrono::system_clock::now();
     }
 
 
     void behavior(player *p) {
-        //std::cout<<"behave"<<std::endl;
-        // walking (now exists only on x-axis)
 		if(this->x_direction){
 		    if (this->right_direction) {
 		        if (this->x <= this->x0 + walking_radius) {
@@ -412,10 +413,7 @@ public:
 		    }
 
 		}
-
-        // attack
         if ((p->dead==0)&&(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() < 500) && (this->is_attacking == 1)) {
-            //std::cout << "IN PROCESS" << std::endl;
             if ((sqrt(pow(p->get_x() - this->x + this->get_centre_x() - p->get_centre_x(), 2) + pow(p->get_y() - this->y + this->get_centre_y() - p->get_centre_y(), 2)) <= this->attack_radius) && (this->damaged_player == false)) {
                 this->last_hit = std::chrono::system_clock::now();
                 std::cout << "player damaged " << p->get_hp() << std::endl;
@@ -429,7 +427,12 @@ public:
         if ((std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() >= 500) && (this->is_attacking == true)) {
             this->is_attacking = false;
         }
-        if ((std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() >= this->attack_period) && (this->is_attacking == false)) {
+        int counted = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
+        // monsters don't attack at the same moment
+        if ((counted - random_start >= this->attack_period) && (this->is_attacking == false)) {
+            if (random_start) {
+                random_start = 0;
+            }
             if (this->is_attacking == false) {
                 this->is_attacking = true;
                 this->damaged_player = false;
