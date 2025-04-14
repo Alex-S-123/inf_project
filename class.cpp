@@ -792,7 +792,7 @@ int main(){
             for(int i = 0; i < p; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
                     field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
-                    field.setTextureRect(IntRect(30*level[i][j]-30, 0, 30*level[i][j], 30));
+                    field.setTextureRect(IntRect(30*level[i][j]-30, 0, 30, 30));
 					window.draw(field);
                 }
             }
