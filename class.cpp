@@ -110,11 +110,9 @@ class player;
 class monster: public object{
 protected:
     int hp, armor, damage, speed;
-
     item* inner;
 public:
     monster():object(0,0,0,0){};
-    void damaged(int damag);
     int atack();
     int get_type(){return this->type;}
     int get_hp() {
@@ -266,6 +264,7 @@ public:
                 if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < dist_atack)) {
                     if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > time_atack) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
+                            //monsters_list[i]->set_hp(-1 * this->get_damage());
                             monsters_list[i]->set_hp(-1 * this->get_damage());
                             std::cout << "time delta: " << time_delta << std::endl;
                             std::cout << "monster damaged, monster's hp: " << monsters_list[i]->get_hp() << std::endl;
@@ -286,7 +285,6 @@ public:
 		dist_atack = 25;
     }
 };
-
 
 class treasure: public object{
 protected:
@@ -411,10 +409,13 @@ public:
 		            this->right_direction = true;
 		        }
 		    }
-
 		}
         if ((p->dead==0)&&(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() < 500) && (this->is_attacking == 1)) {
-            if ((sqrt(pow(p->get_x() - this->x + this->get_centre_x() - p->get_centre_x(), 2) + pow(p->get_y() - this->y + this->get_centre_y() - p->get_centre_y(), 2)) <= this->attack_radius) && (this->damaged_player == false)) {
+            if (
+                (pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) <= pow(this->attack_radius, 2))
+                && (this->damaged_player == false)
+                )
+            {
                 this->last_hit = std::chrono::system_clock::now();
                 std::cout << "player damaged " << p->get_hp() << std::endl;
                 if (p->get_hp() == false) {
@@ -442,6 +443,62 @@ public:
     }
 };
 
+class bomb: public monster {
+// bomb falls out of flight periodically
+// if bomb falls on player, player is damaged
+protected:
+public:
+    bomb(int sx, int sy, int tx0, int ty0, int speed) {
+    }
+    ~bomb() {}
+    void behavior() {
+        this->set_pos(x - speed, y);
+        // if bomb contacts ground, it is destroyed! It hasn't been created yet.
+    }
+};
+
+class flight: public monster {
+// monster flies up and down
+// monster throws bombs
+// monster falls if it dies
+protected:
+    int xp, yp;
+    int fly_radius;
+    bool up_direction;
+    int period_bomb;
+    int time_last;
+public:
+    flight(int xp, int yp, int tx0, int ty0) {
+        this->period_bomb = rand() % (7000 - 3000 + 1) / 3000;
+        this->xp = xp;
+        this->yp = yp;
+        this->time_last = 0;
+        this->fly_radius = 10;
+        this->speed = 8;
+        this->up_direction = true;
+    }
+    void behavior() {
+        // flying (now exists only on x-axis)
+        if (this->up_direction) {
+            if (this->x <= this->xp + this->fly_radius) {
+                this->x += this->speed;
+            } else {
+                this->up_direction = false;
+            }
+        } else {
+            if (this->x >= this->x0 - up_direction) {
+                this->x -= this->speed;
+            } else {
+                this->up_direction = true;
+            }
+        }
+        // attack (attacks only on x-axis)
+        if (clock() - this->time_last > this->period_bomb) {
+            this->time_last = 0;
+            // bomb is created
+        }
+    }
+};
 
 int main(){
 	std::ifstream f("field.txt");
@@ -528,7 +585,7 @@ int main(){
 	objects_list[0]->give(new item(1000, 1000, 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000));
 
 	int cx = 0, cy= 0;
-    player* player_1 = new player(0,0,10,10, 30*cx, 30*cy, 5);
+    player* player_1 = new player(0,0,25,10, 30*cx, 30*cy, 5);
 
     VideoMode vid;
 	vid.width = 30*(n+2);
@@ -593,8 +650,6 @@ int main(){
 						player_1->inner[tmp->type] = tmp;
 					}
 				}
-
-
 			}
 			if(inv_x < 0) inv_x = 7;
 			if(inv_x > 7) inv_x = 0;
@@ -653,11 +708,9 @@ int main(){
 						mi = ro;
 						ind = i;
 					}
-
 				}
 			}
 			if(ind >= 0){
-
 				if(n_iter_drawing < 100){
 					n_iter_drawing+=1;
 					aim.setFillColor(Color(250, 0, 0));
