@@ -3,18 +3,17 @@
 #include <fstream>
 #include <chrono>
 #include <cmath>
-#include <vector>
-
+#include <string>
 using namespace sf;
 
 
 class item{
 protected:
     int x0, y0, x1, y1; //texture rect for menue
-    char* name;
+    //char* name;
 public:
 	int boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist,  type, number, cost;
-	item(int damage, int armor, int hp, int speed, int atack_speed, int dist,  int t, int c, int sx, int sy, int tx0, int ty0){
+	item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int sx, int sy, int tx0, int ty0){
 		boost_damage = damage;
 		boost_armor = armor;
 		boost_hp = hp;
@@ -23,10 +22,10 @@ public:
 		boost_dist = dist;
 		type = t;
 		cost = c;
-		this->x1 = 0;
-        this->y1 = 0;
-        this->x0 = 60;
-        this->y0 = 60;
+		this->x1 = sx;
+        this->y1 = sy;
+        this->x0 = tx0;
+        this->y0 = ty0;
 	}
 	item(){
 		boost_damage = 0;
@@ -92,8 +91,8 @@ public:
 	bool get_collision() {return collision;}
 
 
-	virtual bool give(item* it){}
-	virtual item* take(int i){}
+	virtual bool give(item* it){return 0;}
+	virtual item* take(int i){return NULL;}
 };
 
 class player;
@@ -102,12 +101,18 @@ class monster: public object{
 protected:
     int hp, armor, damage, speed;
 	int frames_of_walk;//, frames_after_atack;
+	bool fly;
 
     //item* inner;
 public:
-    monster():object(0,0,0,0){};
+    monster():object(0,0,0,0){
+		fly = false;
+	};
     void damaged(int damag);
     int atack();
+	bool is_flying(){
+		return fly;
+	}
     int get_type(){return this->type;}
     int get_hp() {
         return this->hp;
@@ -272,7 +277,7 @@ public:
                 // player damages kills monsters
                 // attack works for center of monster and player
                 auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
-                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < dist_atack)) {
+                if ((this->get_attack() == true) && (sqrt(pow(monsters_list[i]->get_centre_x() - this->get_centre_x(), 2)+ pow(monsters_list[i]->get_centre_y() - this->get_centre_y(), 2)) < dist_atack)&&(monsters_list[i]->is_flying()==false)) {
                     if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > time_atack) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
                             monsters_list[i]->set_hp(-1 * this->get_damage());
@@ -577,6 +582,7 @@ public:
         this->time_last = 0;
         this->fly_radius = 10;
         this->speed = 8;
+		this->fly = true;
         this->up_direction = true;
     }
     void behavior() {
@@ -602,22 +608,37 @@ public:
     }
 };
 
+void load_level(int n_of_level, int**& level, monster**& monsters_list, object**& objects_list, int& num_of_monsters, int& num_of_objects, int& p, int& q, player* pla){
 
-int main(){
-	std::ifstream f("field.txt");
-	bool inv_open = false;
-	int inv_x = 0,  inv_y = 0;
-	int p, q;
-	f >> p >> q;
-    int** level = new int* [p+2];
+	if(level){
+		for(int i = 0; i < p+2; i++){
+				delete[] level[i];
+		}
+		delete[] level;
+	}
+	for(int i = 0; i < num_of_monsters; i++){
+		delete monsters_list[i];
+	}
+	if(monsters_list) delete[] monsters_list;
+	for(int i = 0; i < num_of_objects; i++){
+		delete objects_list[i];
+	}
+	if(objects_list)delete[] objects_list;
+
+	std::ifstream f("field"+std::to_string(n_of_level)+".txt");
+	int xplay, yplay;
+	f>>xplay >> yplay;
+	pla->set_pos(xplay, yplay);
+	f>>p>>q;
+	level = new int* [p+2];
 	level[0] = new int [q+2];
 	level[p+1] = new int [q+2];
-	for(int i = 1; i < q+2; i++){
+	for(int i = 0; i < q+2; i++){
 		level[0][i] = 0;
 		level[p+1][i] = 0;
 	}
 	for(int i = 1; i < p+1; i++){
-		level[i] = new int[15];
+		level[i] = new int[q+2];
 		for(int j = 0; j < q+2; j++){
 			if(j == 0 || j == q+1)level[i][j] = 0;
 			else f >> level[i][j];
@@ -627,10 +648,9 @@ int main(){
 
 
 
-	std::ifstream fm("monsters.txt");
-	int num_of_monsters;
+	std::ifstream fm("monsters"+std::to_string(n_of_level)+".txt");
 	fm >> num_of_monsters;
-	monster** monsters_list = new monster*[num_of_monsters];
+	monsters_list = new monster*[num_of_monsters];
 	for(int i = 0; i < num_of_monsters; i++){
 		int type, x0, y0;
 		fm >> type;
@@ -640,12 +660,12 @@ int main(){
 			monsters_list[i] = new soyjak_typical(x0, y0, rad, dir);
 		}
 	}
+	fm.close();
 
 
-	std::ifstream fo("objects.txt");
-	int num_of_objects;
+	std::ifstream fo("objects"+std::to_string(n_of_level)+".txt");
 	fo >> num_of_objects;
-	object** objects_list = new object*[2*(num_of_objects+num_of_monsters)];
+	objects_list = new object*[2*(num_of_objects+num_of_monsters)];
 	for(int i = 0; i < num_of_objects; i++){
 		int type, x0, y0;
 		fo >> type >> x0 >> y0;
@@ -655,8 +675,50 @@ int main(){
 		// here is creating new objects from file
 	}
 
+}
+
+void load_saving(int**& level, monster**& monsters_list, object**& objects_list, int& num_of_monsters, int& num_of_objects, int& p, int& q, player* pla){
+	std::ifstream fs("save.txt");
+	int n_of_level;
+	fs >> n_of_level;
+	if(n_of_level > 0){
+		load_level(n_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, pla);
+		for(int i = 0; i < 28; i++){
+			int type;
+			fs >> type;
+			if(type > 0){
+				int a, b, c, d, e, f, g, h, k, l, o;
+				fs >> a >> b >> c >> d >> e >> f >> g >> h >> k >> l >> d;
+				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h, k, l, o);
+			}
+			else{
+				pla->inner[i] = NULL;
+			}
+		}
+	}
+	else{
+		load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, pla);
+	}
+	
+}
+
+
+int main(){
+	bool inv_open = false;
+	int num_of_monsters = 0;
+	int inv_x = 0,  inv_y = 0;
+	int p = 0, q = 0;
+	int num_of_objects = 0;
+	monster** monsters_list = NULL;
+	object** objects_list = NULL;
+	int** level = NULL;
+
+	player* player_1 = new player(0,0,36,20, 0, 0, 5);
+
+	load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
+
 	bool dist_atacked = false;
-	int n_iter_drawing = 1000, ind_of_aim;
+	int n_iter_drawing = 1000, ind_of_aim = 0;
     int n = 20; //number of plates we see
     int monster_types = 1;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
@@ -666,7 +728,7 @@ int main(){
 	int object_types = 1;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
 	objects_tex[0] = new RectangleShape(Vector2f(15, 15));
-	objects_tex[0]->setFillColor(Color(0, 128, 0));
+	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
     //field.setFillColor(Color(90, 90, 90));
@@ -685,10 +747,8 @@ int main(){
 	inv_bord.setFillColor(Color(70, 70, 70));
 
 	//comment line after
-	objects_list[0]->give(new item(1000, 1000, 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000));
-
-	int cx = 0, cy= 0;
-    player* player_1 = new player(0,0,36,20, 30*cx, 30*cy, 5);
+	objects_list[0]->give(new item(2, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+    
 
 
 	Texture field_tex;
@@ -791,7 +851,7 @@ int main(){
         for(int j = 0; j < q; j++){
             for(int i = 0; i < p; i++){
                 if(abs(player_1->get_x()-30*i)+abs(player_1->get_y() - 30*j) < 41*30 && level[i][j] != 0){
-                    field.setPosition(30-player_1->get_y()+30*i + (-cy+9)*30, 30 - player_1->get_x() + 30*j + (-cx+9)*30);
+                    field.setPosition(30-player_1->get_y()+30*i + (9)*30, 30 - player_1->get_x() + 30*j + (9)*30);
                     field.setTextureRect(IntRect(0, 30*level[i][j]-30, 30, 30));
 					window.draw(field);
                 }
@@ -801,7 +861,7 @@ int main(){
 		for(int i = 0; i < num_of_objects; i++){
             if(objects_list[i]){
                 if(abs(player_1->get_x()-objects_list[i]->get_x())+abs(player_1->get_y()-objects_list[i]->get_y()) < 40*30){
-                    objects_tex[objects_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+objects_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ objects_list[i]->get_x()+ (-cx+10)*30);
+                    objects_tex[objects_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+objects_list[i]->get_y()+(10)*30,30-player_1->get_x()+ objects_list[i]->get_x()+ (10)*30);
                     window.draw(*objects_tex[objects_list[i]->get_type()-1]);
                 }
             }
@@ -810,7 +870,7 @@ int main(){
 		for(int i = 0; i < num_of_monsters; i++){
             if(monsters_list[i]){
                 if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
-                    monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(-cy+10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (-cx+10)*30);
+                    monsters_tex[monsters_list[i]->get_type()-1]->setPosition(30-player_1->get_y()+monsters_list[i]->get_y()+(10)*30,30-player_1->get_x()+ monsters_list[i]->get_x()+ (10)*30);
                     monsters_tex[monsters_list[i]->get_type()-1]->setTextureRect(monsters_list[i]->tex_rect());
 					window.draw(*monsters_tex[monsters_list[i]->get_type()-1]);
                 }
@@ -841,7 +901,7 @@ int main(){
 					aim.setFillColor(Color(250, 0, 0));
 				}else ind_of_aim = ind;
 				if(monsters_list[ind_of_aim]!=NULL){
-					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(-cy+10)*30-5,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (-cx+10)*30-5);
+					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(10)*30-5,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (10)*30-5);
 					window.draw(aim);
 				}
 
