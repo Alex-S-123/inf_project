@@ -752,7 +752,7 @@ int main(){
 
 
 	Texture field_tex;
-	field_tex.loadFromFile("terrain.png");
+	field_tex.loadFromFile("terrains.png");
 	field.setTexture(&field_tex);
 
 	Texture player_tex;
