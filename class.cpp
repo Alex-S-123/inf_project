@@ -13,7 +13,7 @@ protected:
     //char* name;
 public:
 	int boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist,  type, number, cost;
-	item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int sx, int sy, int tx0, int ty0){
+	item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu){
 		boost_damage = damage;
 		boost_armor = armor;
 		boost_hp = hp;
@@ -22,10 +22,7 @@ public:
 		boost_dist = dist;
 		type = t;
 		cost = c;
-		this->x1 = sx;
-        this->y1 = sy;
-        this->x0 = tx0;
-        this->y0 = ty0;
+		number = nu;
 	}
 	item(){
 		boost_damage = 0;
@@ -93,6 +90,9 @@ public:
 
 	virtual bool give(item* it){return 0;}
 	virtual item* take(int i){return NULL;}
+	virtual int destination(){
+		return 0;
+	}
 };
 
 class player;
@@ -135,9 +135,9 @@ public:
 		std::chrono::time_point<std::chrono::system_clock> last_hit;
 		std::chrono::time_point<std::chrono::system_clock> last_dist_hit;
 		bool dead;
-		player(int sx, int sy, int tx0, int ty0, int x0, int y0, int health) : object(sx, sy, tx0, ty0){
-			x = x0;
-			y = y0;
+		player(int sx, int sy, int tx0, int ty0, int health) : object(sx, sy, tx0, ty0){
+			x = 0;
+			y = 0;
 			speed = 1;
 			damage = 1;
 			armor = 0;
@@ -199,6 +199,9 @@ public:
                 }
             }
         }
+		void set_hp(int he){
+			hp = he;
+		}
 
 		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
 		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+ysize)/30+1][(x-speed)/30+1] > 0)) {x -= speed; r_dir = true; is_walking = true; frames_of_walk++;}
@@ -390,9 +393,19 @@ class chest:public treasure, public gate{
     item* take(int i);
 };
 
-class teleport:public gate{
+class teleport:public object{
 protected:
     int go_to;
+public:
+	teleport(int x0, int y0, int dest):object(0, 0, 40, 60){
+		x = x0;
+		y = y0;
+		type = 2;
+		go_to = dest;
+	}
+	int destination(){
+		return go_to;
+	}
 };
 
 class sign: public object{
@@ -420,7 +433,7 @@ protected:
     bool damaged_player;
     int attack_period;
     int wait_time;
-    //need texture size!
+
 public:
     bool is_attacking;
     int random_start;
@@ -625,7 +638,7 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 	}
 	if(objects_list)delete[] objects_list;
 
-	std::ifstream f("field"+std::to_string(n_of_level)+".txt");
+	std::ifstream f(std::to_string(n_of_level)+"/field.txt");
 	int xplay, yplay;
 	f>>xplay >> yplay;
 	pla->set_pos(xplay, yplay);
@@ -648,7 +661,7 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 
 
 
-	std::ifstream fm("monsters"+std::to_string(n_of_level)+".txt");
+	std::ifstream fm(std::to_string(n_of_level)+"/monsters.txt");
 	fm >> num_of_monsters;
 	monsters_list = new monster*[num_of_monsters];
 	for(int i = 0; i < num_of_monsters; i++){
@@ -663,7 +676,7 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 	fm.close();
 
 
-	std::ifstream fo("objects"+std::to_string(n_of_level)+".txt");
+	std::ifstream fo(std::to_string(n_of_level)+"/objects.txt");
 	fo >> num_of_objects;
 	objects_list = new object*[2*(num_of_objects+num_of_monsters)];
 	for(int i = 0; i < num_of_objects; i++){
@@ -671,6 +684,11 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 		fo >> type >> x0 >> y0;
 		if(type == 1){
 			objects_list[i] = new treasure(x0, y0);
+		}
+		if(type == 2){
+			int dest;
+			fo>>dest;
+			objects_list[i] = new teleport(x0, y0, dest);
 		}
 		// here is creating new objects from file
 	}
@@ -683,13 +701,16 @@ void load_saving(int**& level, monster**& monsters_list, object**& objects_list,
 	fs >> n_of_level;
 	if(n_of_level > 0){
 		load_level(n_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, pla);
+		int he;
+		fs >> he;
+		pla->set_hp(he);
 		for(int i = 0; i < 28; i++){
 			int type;
 			fs >> type;
 			if(type > 0){
 				int a, b, c, d, e, f, g, h, k, l, o;
-				fs >> a >> b >> c >> d >> e >> f >> g >> h >> k >> l >> d;
-				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h, k, l, o);
+				fs >> a >> b >> c >> d >> e >> f >> g >> h;
+				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h);
 			}
 			else{
 				pla->inner[i] = NULL;
@@ -703,6 +724,26 @@ void load_saving(int**& level, monster**& monsters_list, object**& objects_list,
 }
 
 
+void creat_saving(int num_of_level, player* pla){
+	std::ofstream fns("save.txt");
+	fns << num_of_level << '\n';
+	fns << pla->get_hp() << '\n';
+	for(int i = 0; i < 28; i++){
+		if(pla->inner[i]){
+			//type, boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist, number, cost;
+			fns << pla->inner[i]->type << " " << pla->inner[i]->boost_damage << " " << pla->inner[i]->boost_armor 
+			<< " " << pla->inner[i]->boost_hp << " " << pla->inner[i]->boost_speed << " " 
+			<< pla->inner[i]->boost_atack_speed << " " << pla->inner[i]->boost_dist 
+			<< " " << pla->inner[i]->cost << " " << pla->inner[i]->number << '\n';
+		}
+		else{
+			fns << 0 << '\n';
+		}
+	}
+	fns.close();
+}
+
+
 int main(){
 	bool inv_open = false;
 	int num_of_monsters = 0;
@@ -712,11 +753,12 @@ int main(){
 	monster** monsters_list = NULL;
 	object** objects_list = NULL;
 	int** level = NULL;
+	int num_of_level = 1;
+	
 
-	player* player_1 = new player(0,0,36,20, 0, 0, 5);
+	player* player_1 = new player(0,0,36,20,5);
 
-	load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
-
+	load_level(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
 	bool dist_atacked = false;
 	int n_iter_drawing = 1000, ind_of_aim = 0;
     int n = 20; //number of plates we see
@@ -725,10 +767,12 @@ int main(){
 	monsters_tex[0] = new RectangleShape(Vector2f(28, 46));
 	//monsters_tex[0]->setFillColor(Color(128, 0, 0));
 
-	int object_types = 1;
+	int object_types = 2;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
 	objects_tex[0] = new RectangleShape(Vector2f(15, 15));
 	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
+	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
+	objects_tex[1]->setFillColor(Color(0, 0, 128));
 
     RectangleShape field(Vector2f(30, 30)); //one element of terrain
     //field.setFillColor(Color(90, 90, 90));
@@ -747,20 +791,20 @@ int main(){
 	inv_bord.setFillColor(Color(70, 70, 70));
 
 	//comment line after
-	objects_list[0]->give(new item(2, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	objects_list[0]->give(new item(2, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
     
 
 
 	Texture field_tex;
-	field_tex.loadFromFile("terrains.png");
+	field_tex.loadFromFile("textures/terrains.png");
 	field.setTexture(&field_tex);
 
 	Texture player_tex;
-	player_tex.loadFromFile("player.png");
+	player_tex.loadFromFile("textures/player.png");
 	play.setTexture(&player_tex);
 	Texture** mons_te = new Texture*[monster_types];
 	mons_te[0] = new Texture;
-	mons_te[0]->loadFromFile("soyjak.png");
+	mons_te[0]->loadFromFile("textures/soyjak.png");
 	for(int i = 0; i < monster_types; i++){
 		monsters_tex[i]->setTexture(mons_te[i]);
 	}
@@ -784,7 +828,21 @@ int main(){
 		for(int i = 0; i < num_of_monsters; i++){
 				if(monsters_list[i])monsters_list[i]->behavior(player_1);
 			}
-		if((!inv_open) && (player_1->dead == 0))player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
+		if((!inv_open) && (player_1->dead == 0)){
+			player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
+			if(Keyboard::isKeyPressed(Keyboard::T)){
+				int ind = -1;
+				//std::cout << abs(player_1->get_centre_x()-objects_list[0]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[0]->get_centre_y()) << std::endl;
+				for(int i = 0; i < num_of_objects; i++){
+					if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 2) ind = i;
+				}
+				if(ind>=0){
+					num_of_level = objects_list[ind]->destination();
+					load_level(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
+					creat_saving(num_of_level, player_1);
+				}
+			}
+		}
 		else{
 			if(Keyboard::isKeyPressed(Keyboard::W)) inv_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) inv_x += 1;
