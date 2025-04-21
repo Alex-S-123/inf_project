@@ -172,7 +172,7 @@ public:
 
 		bool give(item* it){
 			if(num_of_items == 24||it==NULL) return 0;
-			if(it->type == 5){
+			if(it->type == 4){
 				gold += it->cost;
 				return 1;
 			}
@@ -761,16 +761,15 @@ int main(){
 	int num_of_level = 1;
 	bool in_main_menue = true;
 	int max_hp = 5;
+
+
 	Font font;
 	font.loadFromFile("textures/arial.ttf");
 	Text text;
 	text.setFont(font);
 	text.setFillColor(Color(250, 250, 250));
-	text.setString("HELLOW");
 	text.setCharacterSize(25);
 
-
-	
 
 	player* player_1 = new player(0,0,36,20,max_hp);
 
@@ -788,7 +787,7 @@ int main(){
 	objects_tex[0] = new RectangleShape(Vector2f(15, 15));
 	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
-	objects_tex[1]->setFillColor(Color(0, 0, 128));
+	objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
 
     RectangleShape field(Vector2f(30, 30)); 
     RectangleShape play(Vector2f(20, 36));
@@ -807,20 +806,35 @@ int main(){
 	inv_text_back.setFillColor(Color(0, 0, 0)); 
 
 	RectangleShape main_back(Vector2f(30*(n+2), 30*(n+2)));
-	main_back.setFillColor(Color(200, 200, 200));
+	RectangleShape aim(Vector2f(40, 40));
+	
 	RectangleShape dead_back(Vector2f(30*(n+2), 30*(n+2)));
 	dead_back.setFillColor(Color(0,0,0,150));
 	RectangleShape button_back(Vector2f(250, 36));
 	button_back.setFillColor(Color(140, 70, 20));
 	RectangleShape button_ch(Vector2f(258, 44));
 	button_ch.setFillColor(Color(250, 250, 250));
+	RectangleShape hp_bar(Vector2f(280, 40));
+	hp_bar.setFillColor(Color(200, 0,0));
 
 	//comment line after
-	player_1->give(new item(2, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(2, 2, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(4, 2, 1000, 1000, 1000, 1000, 1000, 45, 1000));
     
 
-	CircleShape aim(5.f);
+
+	
 	//add texture
+
+
+	Texture aim_tex;
+	aim_tex.loadFromFile("textures/aim.png");
+	aim.setTexture(&aim_tex);
+
+
+	Texture ma_menue;
+	ma_menue.loadFromFile("textures/menue.png");
+	main_back.setTexture(&ma_menue);
 
 
 	Texture field_tex;
@@ -1033,16 +1047,20 @@ int main(){
 					aim.setFillColor(Color(250, 0, 0));
 				}else ind_of_aim = ind;
 				if(monsters_list[ind_of_aim]!=NULL){
-					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(10)*30-5,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (10)*30-5);
+					aim.setPosition(30-player_1->get_y()+monsters_list[ind_of_aim]->get_centre_y()+(10)*30-20,30-player_1->get_x()+ monsters_list[ind_of_aim]->get_centre_x()+ (10)*30-20);
 					window.draw(aim);
 				}
 
-				aim.setFillColor(Color(0, 128, 0));
+				aim.setFillColor(Color(0, 250, 0));
 			}
 		}
 		if (player_1->dead == 0) {
 			play.setTextureRect(player_1->tex_rect());
             window.draw(play);
+			float hp = player_1->get_hp() + 1;
+			hp_bar.setPosition(350-140.f*hp/max_hp, 610);
+			hp_bar.setSize(Vector2f(280*hp/max_hp, 30.f));
+			window.draw(hp_bar);
 		}
 		if(inv_open){
 			window.draw(inv_back);
@@ -1080,8 +1098,8 @@ int main(){
 			window.draw(inv_item);
 			inv_item.setFillColor(Color(0, 0, 0));
 			text.setCharacterSize(15);
-			text.setString(std::to_string(player_1->get_gold()));
-			text.setPosition(55+40, 45);
+			text.setString("gold: "+std::to_string(player_1->get_gold()));
+			text.setPosition(55+5, 45);
 			window.draw(text);
 			text.setCharacterSize(25);
 			if(player_1->inner[0]){
