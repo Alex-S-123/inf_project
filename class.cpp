@@ -514,7 +514,7 @@ public:
                     p->dead = true;
                 }
                 this->damaged_player = true;
-                p->damaged(1);
+                p->damaged(damage);
             }
         }
         if ((std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() >= 500) && (this->is_attacking == true)) {
@@ -622,11 +622,59 @@ public:
     }
 };
 
+class ball: public monster{
+protected:
+	int xl, xr, yl, yr;
+	int xspeed, yspeed;
+	bool damaged_player;
+public:
+ball(int xl, int yl, int xr, int yr){
+	this->hp = 10;
+	this->armor = 1;
+	this->damage = 1;
+	this->x = xl+5;
+	this->y = yl;
+	this->type = 4;
+	this->xl = xl;
+	this->xr = xr;
+	this->yl = yl;
+	this->yr = yr;
+	y1 = 40;
+	x1 = 40;
+	collision = true;
+	this->damaged_player = false;
+}
+void behavior(player* pla){
+	if(x <= xl || x>=xr || y<=yl || y>=yr){
+		xspeed = rand() % (3 - 0 + 1) + 0;
+		yspeed = rand() % (3 - 0 + 1) + 0;
+		if(x>=xr){
+			xspeed *= -1;
+		}
+		if(y>=yr){
+			yspeed *= -1;
+		}
+	}
+	x += xspeed;
+	y += yspeed;
+	if(pow(abs(this->get_centre_x() - pla->get_centre_x()), 2) + pow(abs(this->get_centre_y() - pla->get_centre_y()), 2) <= pow(60, 2)){
+		if(!damaged_player){
+			damaged_player = true;
+			pla->damaged(damage);
+			if (pla->get_hp() <= 0) {
+				pla->dead = true;
+			}
+		}
+	}
+	else damaged_player = false;
+}
+};
+
 void load_level(int n_of_level, int**& level, monster**& monsters_list, object**& objects_list, int& num_of_monsters, int& num_of_objects, int& p, int& q, player* pla){
 
 	if(level){
 		for(int i = 0; i < p+2; i++){
-				delete[] level[i];
+				if(level[i])delete[] level[i];
 		}
 		delete[] level;
 	}
@@ -672,6 +720,11 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 			int rad, dir;
 			fm >> x0 >> y0 >> rad >> dir;
 			monsters_list[i] = new soyjak_typical(x0, y0, rad, dir);
+		}
+		else if(type == 4){
+			int x1, y1;
+			fm >>x0 >> y0 >> x1 >> y1;
+			monsters_list[i] = new ball(x0, y0, x1, y1);
 		}
 	}
 	fm.close();
@@ -779,13 +832,19 @@ int main(){
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
 	monsters_tex[0] = new RectangleShape(Vector2f(28, 46));
 	//monsters_tex[0]->setFillColor(Color(128, 0, 0));
+	monsters_tex[3] = new RectangleShape(Vector2f(40, 40));
+	monsters_tex[3]->setFillColor(Color(128, 0, 0));
 
 	int object_types = 2;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
 	objects_tex[0] = new RectangleShape(Vector2f(25, 25));
 	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
-	objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
+	//objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
+
+	Texture obj1_tex;
+	obj1_tex.loadFromFile("textures/portal.png");
+	objects_tex[1]->setTexture(&obj1_tex);
 
     RectangleShape field(Vector2f(30, 30)); 
     RectangleShape play(Vector2f(20, 36));
