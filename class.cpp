@@ -209,7 +209,7 @@ public:
 		}
 
 		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
-			speed = 1;
+			speed = 2;
 			damage = 1;
 			armor = 0;
 			time_atack = 3000;
@@ -310,7 +310,7 @@ public:
                             std::cout << "monster damaged, monster's hp: " << monsters_list[i]->get_hp() << std::endl;
                             this->last_hit = std::chrono::system_clock::now();
                         } else {
-                            monsters_list[i] = NULL;
+                            if(monsters_list[i] ->get_type() != 3)monsters_list[i] = NULL;
                             std::cout << "monster killed!" << std::endl;
                         }
                     }
@@ -510,7 +510,7 @@ public:
             {
                 this->last_hit = std::chrono::system_clock::now();
                 std::cout << "player damaged " << p->get_hp() << std::endl;
-                if (p->get_hp() == false) {
+                if (p->get_hp() <= 0) {
                     p->dead = true;
                 }
                 this->damaged_player = true;
@@ -565,68 +565,149 @@ public:
 };
 
 class bomb: public monster {
-// bomb falls out of flight periodically
-// if bomb falls on player, player is damaged
-protected:
-public:
-    bomb(int sx, int sy, int tx0, int ty0, int speed) {
-    }
-    ~bomb() {}
-    void behavior() {
-        this->set_pos(x - speed, y);
-        // if bomb contacts ground, it is destroyed! It hasn't been created yet.
-    }
-};
+	// bomb falls out of flight periodically
+	// if bomb falls on player, player is damaged
+	protected:
+		int distance;
+		int limit;
+		int attack_radius;
+		int frames_after_atack;
+		bool is_attacking;
+	public:
+		
+		bomb() {
+			std::cout << "Bomb created!" << std::endl;
+			this->type = 3;
+			this->x = 0; 
+			this->y = 0;
+			this->speed = 3;
+			this->distance = 0; // distance - between start point and current point
+			this->limit = 50; // distance where bomb explodes
+			this->hp = 1;
+			this->attack_radius = 60;
+			x0 = 0;
+			x1 = 37;
+			damage = 4;
+			frames_after_atack = 100;
+			collision = false;
+		}
+		
+		void start_attack(int x0, int y0){
+			this->set_pos(x0, y0);
+			distance = 0;
+			is_attacking = 1;
+			hp = 1;
+		}
 
-class flight: public monster {
-// monster flies up and down
-// monster throws bombs
-// monster falls if it dies
-protected:
-    int xp, yp;
-    int fly_radius;
-    bool up_direction;
-    int period_bomb;
-    int time_last;
-public:
-    flight(int xp, int yp, int tx0, int ty0) {
-        this->period_bomb = rand() % (7000 - 3000 + 1) / 3000;
-        this->xp = xp;
-        this->yp = yp;
-        this->time_last = 0;
-        this->fly_radius = 10;
-        this->speed = 8;
-		this->fly = true;
-        this->up_direction = true;
-    }
-    void behavior() {
-        // flying (now exists only on x-axis)
-        if (this->up_direction) {
-            if (this->x <= this->xp + this->fly_radius) {
-                this->x += this->speed;
-            } else {
-                this->up_direction = false;
-            }
-        } else {
-            if (this->x >= this->x0 - up_direction) {
-                this->x -= this->speed;
-            } else {
-                this->up_direction = true;
-            }
-        }
-        // attack (attacks only on x-axis)
-        if (clock() - this->time_last > this->period_bomb) {
-            this->time_last = 0;
-            // bomb is created
-        }
-    }
-};
+		void behavior(player *p) {
+			if(frames_after_atack < 20) frames_after_atack++;
+			if(hp <= 0){
+				is_attacking = false;
+			}
+			if(is_attacking){
+				this->x += speed;
+				this->distance += speed;
+				if (this->distance >= this->limit) {
+					//std::cout << "EXPLOSION! " << pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) << std::endl;
+					if ((pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) <= pow(this->attack_radius, 2))
+						) {
+						std::cout << "player's hp before attack " << p->get_hp() << std::endl;
+						p->damaged(damage);
+						if(p->get_hp() <= 0){
+							p->dead = 1;
+						}
+					}
+					is_attacking = false;
+					frames_after_atack = 0;
+				}
+			}
+			if(is_attacking){
+				y0 = 0;
+				y1 = 26;
+			}
+			else if(frames_after_atack < 20){
+				y0 = 26;
+				y1 = 52;
+			}
+			else{
+				y0 = 52;
+				y1 = 78;
+			}
+			// if bomb contacts ground, it is destroyed! 
+		}
+	};
+	
+	class flight: public monster {
+	// monster flies up and down
+	// monster throws bombs
+	protected:
+		int xp, yp;
+		int fly_radius;
+		bool up_direction;
+		int period_bomb;
+		int speed;
+		bomb *b_attack;
+		int frames_of_walk;
+	public:
+		std::chrono::time_point<std::chrono::system_clock> last_hit;
+		flight(int xp, int yp, int rad, bomb* b) {
+			this->type = 2;
+			this->period_bomb = rand() % (7000 - 3000 + 1) + 3000;
+			this->xp = xp;
+			this->yp = yp;
+			this->fly_radius = rad;
+			this->speed = 2;
+			//this->type = 1;
+			this->up_direction = true;
+			this->hp = 3;
+			last_hit = std::chrono::system_clock::now();
+			this->b_attack = b;
+			collision = false;
+			frames_of_walk = 0;
+		}
+		void behavior(player *p) {
+			// flying (now exists only on x-axis)
+			if (this->up_direction) {
+				if (this->x <= this->xp + this->fly_radius) {
+					this->x += this->speed;
+				} else {
+					this->up_direction = false;
+				}
+			} else {
+				if (this->x >= this->x0 - fly_radius) {
+					this->x -= this->speed;
+				} else {
+					this->up_direction = true;
+				}
+			}
+			frames_of_walk = (frames_of_walk+1)%30;
+			// attack (attacks only on x-axis)
+			y0 = (frames_of_walk/10)*50;
+			y1 = y0 + 50;
+			if(up_direction){
+				x0 = 0;
+				x1 = 40;
+			}
+			else{
+				x1 = 0;
+				x0 = 40;
+			}
+	
+			int counted = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
+			if (counted >= this->period_bomb) {
+				std::cout << "flight drops bomb" << std::endl;
+				b_attack->start_attack(this->get_centre_x(), this->get_centre_y());
+				this->last_hit = std::chrono::system_clock::now();
+			}
+		}
+	};
 
 class ball: public monster{
 protected:
 	int xl, xr, yl, yr;
 	int xspeed, yspeed;
 	bool damaged_player;
+	int frames_of_walk;
 public:
 ball(int xl, int yl, int xr, int yr){
 	this->hp = 10;
@@ -639,10 +720,11 @@ ball(int xl, int yl, int xr, int yr){
 	this->xr = xr;
 	this->yl = yl;
 	this->yr = yr;
-	y1 = 40;
-	x1 = 40;
+	y1 = 25;
+	x1 = 25;
 	collision = true;
 	this->damaged_player = false;
+	frames_of_walk = 0;
 }
 void behavior(player* pla){
 	if(x <= xl || x>=xr || y<=yl || y>=yr){
@@ -655,9 +737,10 @@ void behavior(player* pla){
 			yspeed *= -1;
 		}
 	}
+	frames_of_walk = (frames_of_walk + abs(xspeed) + abs(yspeed))%60;
 	x += xspeed;
 	y += yspeed;
-	if(pow(abs(this->get_centre_x() - pla->get_centre_x()), 2) + pow(abs(this->get_centre_y() - pla->get_centre_y()), 2) <= pow(60, 2)){
+	if(pow(abs(this->get_centre_x() - pla->get_centre_x()), 2) + pow(abs(this->get_centre_y() - pla->get_centre_y()), 2) <= pow(45, 2)){
 		if(!damaged_player){
 			damaged_player = true;
 			pla->damaged(damage);
@@ -667,6 +750,17 @@ void behavior(player* pla){
 		}
 	}
 	else damaged_player = false;
+
+	y0 = frames_of_walk/15*25;
+	y1 = y0 + 25;
+	if(xspeed >= 0){
+		x0 = 0;
+		x1 = 25;
+	}
+	else{
+		x1 = 0;
+		x0 = 25;
+	}
 }
 };
 
@@ -712,7 +806,7 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 
 	std::ifstream fm(std::to_string(n_of_level)+"/monsters.txt");
 	fm >> num_of_monsters;
-	monsters_list = new monster*[num_of_monsters];
+	monsters_list = new monster*[2*num_of_monsters];
 	for(int i = 0; i < num_of_monsters; i++){
 		int type, x0, y0;
 		fm >> type;
@@ -720,6 +814,15 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 			int rad, dir;
 			fm >> x0 >> y0 >> rad >> dir;
 			monsters_list[i] = new soyjak_typical(x0, y0, rad, dir);
+		}
+		else if(type == 2){
+			bomb* b = new bomb();
+			num_of_monsters++;
+			int rad;
+			fm >> x0 >> y0 >> rad;
+			monsters_list[i] = new flight(x0, y0, rad, b);
+			i++;
+			monsters_list[i] = b;
 		}
 		else if(type == 4){
 			int x1, y1;
@@ -762,10 +865,11 @@ void load_saving(int& nu_lev, int**& level, monster**& monsters_list, object**& 
 		for(int i = 0; i < 28; i++){
 			int type;
 			fs >> type;
-			if(type > 0){
+			if(type >= 0){
 				int a, b, c, d, e, f, g, h, k, l, o;
 				fs >> a >> b >> c >> d >> e >> f >> g >> h;
 				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h);
+				//item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu)
 			}
 			else{
 				pla->inner[i] = NULL;
@@ -786,14 +890,14 @@ void creat_saving(int num_of_level, player* pla){
 	fns << pla->get_hp() << '\n';
 	for(int i = 0; i < 28; i++){
 		if(pla->inner[i]){
-			//type, boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist, number, cost;
+			//item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu)
 			fns << pla->inner[i]->type << " " << pla->inner[i]->boost_damage << " " << pla->inner[i]->boost_armor 
 			<< " " << pla->inner[i]->boost_hp << " " << pla->inner[i]->boost_speed << " " 
 			<< pla->inner[i]->boost_atack_speed << " " << pla->inner[i]->boost_dist 
 			<< " " << pla->inner[i]->cost << " " << pla->inner[i]->number << '\n';
 		}
 		else{
-			fns << 0 << '\n';
+			fns << -1 << '\n';
 		}
 	}
 	fns.close();
@@ -802,6 +906,7 @@ void creat_saving(int num_of_level, player* pla){
 
 int main(){
 	bool inv_open = false;
+	bool is_winner = false;
 	int num_of_monsters = 0;
 	int inv_x = 0,  inv_y = 0, menue_x = 0;
 	int p = 0, q = 0;
@@ -828,23 +933,25 @@ int main(){
 	bool dist_atacked = false;
 	int n_iter_drawing = 1000, ind_of_aim = 0;
     int n = 20; //number of plates we see
-    int monster_types = 1;
+    int monster_types = 4;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
 	monsters_tex[0] = new RectangleShape(Vector2f(28, 46));
 	//monsters_tex[0]->setFillColor(Color(128, 0, 0));
-	monsters_tex[3] = new RectangleShape(Vector2f(40, 40));
-	monsters_tex[3]->setFillColor(Color(128, 0, 0));
+	monsters_tex[1] = new RectangleShape(Vector2f(40, 50));
+	//monsters_tex[1]->setFillColor(Color(250, 250, 0));
+	monsters_tex[2] = new RectangleShape(Vector2f(37, 26));
+	//monsters_tex[2]->setFillColor(Color(250, 0, 0));
+	monsters_tex[3] = new RectangleShape(Vector2f(25, 25));
+	//monsters_tex[3]->setFillColor(Color(128, 0, 0));
 
 	int object_types = 2;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
 	objects_tex[0] = new RectangleShape(Vector2f(25, 25));
-	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
+	//objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
 	//objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
 
-	Texture obj1_tex;
-	obj1_tex.loadFromFile("textures/portal.png");
-	objects_tex[1]->setTexture(&obj1_tex);
+	
 
     RectangleShape field(Vector2f(30, 30)); 
     RectangleShape play(Vector2f(20, 36));
@@ -863,8 +970,10 @@ int main(){
 	inv_text_back.setFillColor(Color(0, 0, 0)); 
 
 	RectangleShape main_back(Vector2f(30*(n+2), 30*(n+2)));
+	RectangleShape win_back(Vector2f(30*(n+2), 30*(n+2)));
 	RectangleShape aim(Vector2f(40, 40));
 	RectangleShape item_dr(Vector2f(60, 60));
+	RectangleShape background(Vector2f(30*(n+2), 30*(n+2)));
 
 	
 	RectangleShape dead_back(Vector2f(30*(n+2), 30*(n+2)));
@@ -902,9 +1011,18 @@ int main(){
 
 	
 	//add texture
+	Texture back_tex;
+	back_tex.loadFromFile("textures/back.png");
+	background.setTexture(&back_tex);
+
+
 	Texture dead_tex;
 	dead_tex.loadFromFile("textures/wasted.png");
 	dead_back.setTexture(&dead_tex);
+
+	Texture win_tex;
+	win_tex.loadFromFile("textures/victory.png");
+	win_back.setTexture(&win_tex);
 
 	Texture item_tex;
 	item_tex.loadFromFile("textures/weapons.png");
@@ -927,9 +1045,24 @@ int main(){
 	Texture player_tex;
 	player_tex.loadFromFile("textures/player.png");
 	play.setTexture(&player_tex);
+
+	Texture** obj_tex = new Texture*[object_types];
+	obj_tex[1] = new Texture;
+	obj_tex[1]->loadFromFile("textures/portal.png");
+	obj_tex[0] = new Texture;
+	obj_tex[0]->loadFromFile("textures/chest.png");
+	for(int i = 0; i < object_types; i++) objects_tex[i]->setTexture(obj_tex[i]);
+	
+
 	Texture** mons_te = new Texture*[monster_types];
 	mons_te[0] = new Texture;
 	mons_te[0]->loadFromFile("textures/soyjak.png");
+	mons_te[1] = new Texture;
+	mons_te[1]->loadFromFile("textures/flight.png");
+	mons_te[2] = new Texture;
+	mons_te[2]->loadFromFile("textures/bomb.png");
+	mons_te[3] = new Texture;
+	mons_te[3]->loadFromFile("textures/kolobok.png");
 	for(int i = 0; i < monster_types; i++){
 		monsters_tex[i]->setTexture(mons_te[i]);
 	}
@@ -944,7 +1077,7 @@ int main(){
 		auto start = std::chrono::system_clock::now();
 		
 		//all actions of player, monsters, and others
-		if(in_main_menue == false&&player_1->dead==false){
+		if(in_main_menue == false&&player_1->dead==false&&is_winner == false){
 			if(Keyboard::isKeyPressed(Keyboard::F)){
 				if(inv_open) inv_open = false;
 				else inv_open = true;
@@ -965,8 +1098,11 @@ int main(){
 					}
 					if(ind>=0){
 						num_of_level = objects_list[ind]->destination();
-						load_level(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
-						creat_saving(num_of_level, player_1);
+						if(num_of_level == -1) is_winner = true;
+						else{
+							load_level(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
+							creat_saving(num_of_level, player_1);
+						}
 					}
 				}
 			}
@@ -1048,6 +1184,9 @@ int main(){
 			if(menue_x < 0) menue_x = 2;
 			if(menue_x > 2) menue_x = 0;
 			if(Keyboard::isKeyPressed(Keyboard::Q)){
+				for(int j = 0; j < 28; j++){
+					player_1->inner[j] = NULL;
+				}
 				if(menue_x == 0){
 					load_saving(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
 					player_1->dead = false;
@@ -1068,6 +1207,31 @@ int main(){
 			}
 			while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::Q)) continue;
 		}
+		else if(is_winner){
+			if(Keyboard::isKeyPressed(Keyboard::W)) menue_x -= 1;
+			if(Keyboard::isKeyPressed(Keyboard::S)) menue_x += 1;
+			if(menue_x < 0) menue_x = 1;
+			if(menue_x > 1) menue_x = 0;
+			if(Keyboard::isKeyPressed(Keyboard::Q)){
+				for(int j = 0; j < 28; j++){
+					player_1->inner[j] = NULL;
+				}
+				if(menue_x == 0){
+					load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
+					num_of_level = 1;
+					player_1->set_hp(max_hp);
+					is_winner = false;
+				}
+				if(menue_x == 1){
+					player_1->set_hp(max_hp);
+					player_1->dead = false;
+					in_main_menue = true;
+					is_winner = false;
+				}
+				menue_x = 0;
+			}
+			while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::Q)) continue;
+		}
         Event event;
         while (window.pollEvent(event))
         {
@@ -1076,7 +1240,8 @@ int main(){
 			if (event.type == Event::Closed) window.close();
         }
     window.clear(Color(192, 192, 192));
-	if(in_main_menue==false){
+	window.draw(background);
+	if(in_main_menue==false&&is_winner==false){
 		int xmaxf = std::min(q, player_1->get_centre_x()/30+n/2+3), ymaxf = std::min(p, player_1->get_centre_y()/30+n/2+3);
         for(int j = std::max(0, player_1->get_centre_x()/30-n/2-1); j < xmaxf; j++){
             for(int i = std::max(0, player_1->get_centre_y()/30-n/2-1); i < ymaxf; i++){
@@ -1483,7 +1648,7 @@ int main(){
 			window.draw(text);
 		}
 	}
-	else{
+	else if(in_main_menue){
 		window.draw(main_back);
 		button_ch.setPosition(46, 446+50*menue_x);
 		window.draw(button_ch);
@@ -1502,6 +1667,23 @@ int main(){
 		text.setString("Exit game");
 		text.setPosition(60, 552);
 		window.draw(text);
+	}
+	else if(is_winner){
+		window.draw(win_back);
+			button_ch.setPosition(361, 50+446+50*menue_x);
+			button_ch.setFillColor(Color(255, 220, 51));
+			window.draw(button_ch);
+			button_ch.setFillColor(Color(250, 250, 250));
+			button_back.setPosition(365, 500);
+			window.draw(button_back);
+			button_back.setPosition(365, 550);
+			window.draw(button_back);
+			text.setString("New game");
+			text.setPosition(375, 502);
+			window.draw(text);
+			text.setString("Main menue");
+			text.setPosition(375, 552);
+			window.draw(text);
 	}
 	window.display();
 	while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
