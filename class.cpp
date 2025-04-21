@@ -130,6 +130,7 @@ protected:
     bool attack, r_dir, is_walking;
 	int frames_after_atack, frames_of_walk;
 	int xsize, ysize;
+	int max_health;
 public:
 		item** inner;
 		std::chrono::time_point<std::chrono::system_clock> last_hit;
@@ -153,6 +154,7 @@ public:
 			is_walking = false;
 			xsize = 36;
 			ysize = 20;
+			max_health = hp;
 			for(int i = 0; i < 28; i++) inner[i] = NULL;
 		}
 		int get_hp() {
@@ -207,6 +209,20 @@ public:
 		}
 
 		void action(int** level, int p, int q, monster** monsters_list, int n, object** objects_list, int no){
+			speed = 1;
+			damage = 1;
+			armor = 0;
+			time_atack = 3000;
+			dist_atack = 60;
+			for(int i = 0; i<2; i++){
+				if(inner[i]){
+					speed += inner[i]->boost_speed;
+					damage += inner[i]->boost_damage;
+					time_atack -= inner[i]->boost_atack_speed;
+					armor += inner[i]->boost_armor;
+					dist_atack += inner[i]->boost_dist;
+				}
+			}
 		if(Keyboard::isKeyPressed(Keyboard::W) && (x-speed>0) && (level[y/30+1][(x-speed)/30+1] > 0) && (level[(y+ysize)/30+1][(x-speed)/30+1] > 0)) {x -= speed; r_dir = true; is_walking = true; frames_of_walk++;}
 		if(Keyboard::isKeyPressed(Keyboard::S) && (x+xsize + speed < q*30-30) && (level[y/30+1][(x+xsize+speed)/30+1] > 0) && (level[(y+ysize)/30+1][(x+xsize + speed)/30+1] > 0)) {x += speed; r_dir = false; is_walking = true; frames_of_walk++;}
 		if(Keyboard::isKeyPressed(Keyboard::A) && (y-speed > 0) && (level[(y-speed)/30+1][x/30+1] > 0) && (level[(y-speed)/30+1][(x+xsize)/30+1] > 0) )  {y -= speed; r_dir = false; is_walking = true;frames_of_walk++;}
@@ -239,18 +255,21 @@ public:
 						std::cout << "monster killed!" << std::endl;
 					}
 					last_dist_hit = std::chrono::system_clock::now();
+					inner[2]->number -= 1;
+					if(inner[2]->number == 0) inner[2] = NULL;
 				}
 			}
 		}
-		for(int i = 0; i<2; i++){
-			if(inner[i]){
-				speed += inner[i]->boost_speed;
-				damage += inner[i]->boost_damage;
-				time_atack -= inner[i]->boost_atack_speed;
-				armor += inner[i]->boost_armor;
-				dist_atack += inner[i]->boost_dist;
+		if(Keyboard::isKeyPressed(Keyboard::R)){
+			if(inner[3]){
+				hp = std::min(max_health, hp+inner[3]->boost_hp);
+				if(inner[2]) inner[2]->number += inner[3]->boost_speed;
+				inner[3]->number -= 1;
+				if(inner[3]->number == 0) inner[3] = NULL;
+				while(Keyboard::isKeyPressed(Keyboard::R)) continue;
 			}
 		}
+		
 		for(int i = 0; i < n; i++){
 			if(monsters_list[i] != NULL && monsters_list[i]->get_collision()){
 				while((x+xsize >= monsters_list[i]->get_x())&&(x+xsize<=monsters_list[i]->get_centre_x())&&(y<=monsters_list[i]->get_centre_y()&&y+ysize>=monsters_list[i]->get_centre_y())
@@ -298,11 +317,7 @@ public:
                 }
             }
         }
-		speed = 1;
-		damage = 1;
-		armor = 0;
-		time_atack = 3000;
-		dist_atack = 25;
+		
 
 
 		if(frames_after_atack < 20){
@@ -353,7 +368,7 @@ protected:
     int n;
 
 public:
-    treasure(int x, int y):object(0, 0, 15, 15){
+    treasure(int x, int y):object(0, 0, 25, 25){
 		type = 1;
 		n = 0;
 		//collision = true;
@@ -376,25 +391,8 @@ public:
 	}
 };
 
-class wall: public object{
-protected:
-    bool visible;
-public:
-    bool is_visible(){return this->visible;}
-};
 
-class gate:public wall{
-protected:
-    bool is_active;
-    int type;
-    bool destr_key;
-public:
-    bool try_to_open();
-};
 
-class chest:public treasure, public gate{
-    item* take(int i);
-};
 
 class teleport:public object{
 protected:
@@ -633,11 +631,11 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 		delete[] level;
 	}
 	for(int i = 0; i < num_of_monsters; i++){
-		delete monsters_list[i];
+		if(monsters_list[i]) delete monsters_list[i];
 	}
 	if(monsters_list) delete[] monsters_list;
 	for(int i = 0; i < num_of_objects; i++){
-		delete objects_list[i];
+		if(objects_list[i]) delete objects_list[i];
 	}
 	if(objects_list)delete[] objects_list;
 
@@ -784,7 +782,7 @@ int main(){
 
 	int object_types = 2;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
-	objects_tex[0] = new RectangleShape(Vector2f(15, 15));
+	objects_tex[0] = new RectangleShape(Vector2f(25, 25));
 	objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
 	objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
@@ -807,25 +805,51 @@ int main(){
 
 	RectangleShape main_back(Vector2f(30*(n+2), 30*(n+2)));
 	RectangleShape aim(Vector2f(40, 40));
+	RectangleShape item_dr(Vector2f(60, 60));
+
 	
 	RectangleShape dead_back(Vector2f(30*(n+2), 30*(n+2)));
-	dead_back.setFillColor(Color(0,0,0,150));
+	//dead_back.setFillColor(Color(0,0,0,150));
 	RectangleShape button_back(Vector2f(250, 36));
 	button_back.setFillColor(Color(140, 70, 20));
 	RectangleShape button_ch(Vector2f(258, 44));
 	button_ch.setFillColor(Color(250, 250, 250));
 	RectangleShape hp_bar(Vector2f(280, 40));
 	hp_bar.setFillColor(Color(200, 0,0));
+	RectangleShape hp_bar_back(Vector2f(341, 19));
+	hp_bar_back.setPosition(350-140-31, 633);
+	hp_bar_back.setFillColor(Color(0, 0, 0, 175));
 
-	//comment line after
+
+	//comment lines after
+	player_1->give(new item(0, 1, 1000, 0, 1000, 1000, 1000, 1000, 1));
+	player_1->give(new item(0, 2, 1000, 10, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(0, 3, 10, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(0, 4, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(1, 1, 1, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(1, 2, 2, 10, 10, 1000, 1000, 1000, 1000));
+	player_1->give(new item(1, 3, 3, 10, 10, 1000, 1000, 1000, 1000));
+	player_1->give(new item(2, 1, 1000, 1000, 1000, 1000, 1000, 1, 1));
 	player_1->give(new item(2, 2, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(2, 3, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
+	player_1->give(new item(2, 4, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
 	player_1->give(new item(4, 2, 1000, 1000, 1000, 1000, 1000, 45, 1000));
+
+	player_1->give(new item(3, 1, 1, 0, 1, 1000, 1000, 1, 1));
+	player_1->give(new item(3, 2, 1, 1, 0, 1000, 1000, 1000, 1000));
+	//before this
     
 
 
 	
 	//add texture
+	Texture dead_tex;
+	dead_tex.loadFromFile("textures/wasted.png");
+	dead_back.setTexture(&dead_tex);
 
+	Texture item_tex;
+	item_tex.loadFromFile("textures/weapons.png");
+	item_dr.setTexture(&item_tex);
 
 	Texture aim_tex;
 	aim_tex.loadFromFile("textures/aim.png");
@@ -973,6 +997,7 @@ int main(){
 					load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
 					num_of_level = 1;
 					player_1->dead = false;
+					player_1->set_hp(max_hp);
 				}
 				if(menue_x == 2){
 					player_1->set_hp(max_hp);
@@ -1058,8 +1083,9 @@ int main(){
 			play.setTextureRect(player_1->tex_rect());
             window.draw(play);
 			float hp = player_1->get_hp() + 1;
-			hp_bar.setPosition(350-140.f*hp/max_hp, 610);
-			hp_bar.setSize(Vector2f(280*hp/max_hp, 30.f));
+			hp_bar.setPosition(350-140.f*hp/max_hp, 635);
+			hp_bar.setSize(Vector2f(280*hp/max_hp, 15.f));
+			window.draw(hp_bar_back);
 			window.draw(hp_bar);
 		}
 		if(inv_open){
@@ -1076,27 +1102,80 @@ int main(){
 			}
 			for(int i = 0; i < 48; i++){
 				inv_item.setPosition(55+130+(i%6)*70, 40+40+(i/6)*70);
-				if(i%6 < 3 && player_1->inner[(i/6)*3+i%6+4]) inv_item.setFillColor(Color(90, 90, 90));
-				if(ind >= 0 && i%6 >= 3 && objects_list[ind]->inner[(i/6)*3+i%6-3]) inv_item.setFillColor(Color(90, 90, 90));
 				window.draw(inv_item);
-				inv_item.setFillColor(Color(0, 0, 0));
+				item* dr = NULL;
+				if(i%6 < 3){
+					dr = player_1->inner[(i/6)*3+i%6+4];
+				}
+				else if(ind >= 0 && i%6 >= 3){
+					dr = objects_list[ind]->inner[(i/6)*3+i%6-3];
+				}
+				if(dr){
+					item_dr.setPosition(55+130+(i%6)*70, 40+40+(i/6)*70);
+					if(dr->type == 0){
+						item_dr.setTextureRect(IntRect(0, 59*dr->boost_damage-59, 60, 59));
+						window.draw(item_dr);
+					}
+					else if(dr->type == 1){
+						item_dr.setTextureRect(IntRect(0, 59*4+59*dr->boost_armor-59, 60, 59));
+						window.draw(item_dr);
+					}
+					else if(dr->type == 2){
+						item_dr.setTextureRect(IntRect(0, 59*7+59*dr->boost_damage-59, 60, 59));
+						window.draw(item_dr);
+						text.setCharacterSize(15);
+						text.setString(std::to_string(dr->number));
+						text.setPosition(55+130+(i%6)*70+40, 40+40+(i/6)*70+45);
+						window.draw(text);
+						text.setCharacterSize(25);
+					}
+					else if(dr->type == 3){
+						if(dr->boost_hp > 0)item_dr.setTextureRect(IntRect(0, 709, 60, 59));
+						if(dr->boost_speed > 0)item_dr.setTextureRect(IntRect(0, 709+59, 60, 59));
+						window.draw(item_dr);
+						text.setCharacterSize(15);
+						text.setString(std::to_string(dr->number));
+						text.setPosition(55+130+(i%6)*70+40, 40+40+(i/6)*70+45);
+						window.draw(text);
+						text.setCharacterSize(25);
+					}
+					else if(dr->type == 4){
+						item_dr.setTextureRect(IntRect(0, 59*11, 60, 59));
+						window.draw(item_dr);
+					}
+				}
+				
 			}
-			if(player_1->inner[0]) inv_item.setFillColor(Color(90, 90, 90));
 			inv_item.setPosition(55+50, 40+40+40+170);
 			window.draw(inv_item);
-			inv_item.setFillColor(Color(0, 0, 0));
-			if(player_1->inner[1]) inv_item.setFillColor(Color(90, 90, 90));
+			if(player_1->inner[0]){
+				item_dr.setPosition(55+50, 40+40+40+170);
+				item_dr.setTextureRect(IntRect(0, 59*player_1->inner[0]->boost_damage-59, 60, 59));
+				window.draw(item_dr);
+			}
 			inv_item.setPosition(55+50, 40+40+40+170+80);
 			window.draw(inv_item);
-			inv_item.setFillColor(Color(0, 0, 0));
-			if(player_1->inner[2]) inv_item.setFillColor(Color(90, 90, 90));
+			if(player_1->inner[1]) {
+				item_dr.setPosition(55+50, 40+40+40+170+80);
+				item_dr.setTextureRect(IntRect(0, 59*4+59*player_1->inner[1]->boost_armor-59, 60, 59));
+				window.draw(item_dr);
+			}
 			inv_item.setPosition(55+50, 40+40+40+170+160);
 			window.draw(inv_item);
-			inv_item.setFillColor(Color(0, 0, 0));
-			if(player_1->inner[3]) inv_item.setFillColor(Color(90, 90, 90));
+			if(player_1->inner[2]){
+				item_dr.setPosition(55+50, 40+40+40+170+160);
+				item_dr.setTextureRect(IntRect(0, 59*7+59*player_1->inner[2]->boost_damage-59, 60, 59));
+				window.draw(item_dr);
+			}
 			inv_item.setPosition(55+50, 40+40+40+240+170);
 			window.draw(inv_item);
-			inv_item.setFillColor(Color(0, 0, 0));
+			if(player_1->inner[3]){
+				item_dr.setPosition(55+50, 40+40+40+240+170);
+				if(player_1->inner[3]->boost_hp > 0)item_dr.setTextureRect(IntRect(0, 709, 60, 59));
+				if(player_1->inner[3]->boost_speed > 0)item_dr.setTextureRect(IntRect(0, 709+59, 60, 59));
+				window.draw(item_dr);
+			}
+			
 			text.setCharacterSize(15);
 			text.setString("gold: "+std::to_string(player_1->get_gold()));
 			text.setPosition(55+5, 45);
@@ -1167,7 +1246,10 @@ int main(){
 				text.setPosition(3, 40+40+40+240+160);
 				window.draw(text);
 				text.setString("health +"+std::to_string(player_1->inner[3]->boost_hp));
-				text.setPosition(3, 40+40+40+240+160+40);
+				text.setPosition(3, 40+40+40+240+160+30);
+				window.draw(text);
+				text.setString("ammunition +"+std::to_string(player_1->inner[3]->boost_speed));
+				text.setPosition(3, 40+40+40+240+160+50);
 				window.draw(text);
 				text.setString(std::to_string(player_1->inner[3]->number));
 				text.setPosition(55+90, 40+40+40+240+215);
@@ -1227,9 +1309,6 @@ int main(){
 					text.setString("cool down "+std::to_string(player_1->inner[inv_x*3+inv_y+4]->boost_atack_speed/1000));
 					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+60);
 					window.draw(text);
-					text.setString(std::to_string(player_1->inner[inv_x*3+inv_y+4]->number));
-					text.setPosition(55+130+inv_y*70+40, 40+40+inv_x*70+45);
-					window.draw(text);
 					text.setCharacterSize(25);
 				}
 				if(player_1->inner[inv_x*3+inv_y+4]->type == 3){
@@ -1240,10 +1319,10 @@ int main(){
 					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85);
 					window.draw(text);
 					text.setString("health +"+std::to_string(player_1->inner[inv_x*3+inv_y+4]->boost_hp));
-					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+40);
+					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+30);
 					window.draw(text);
-					text.setString(std::to_string(player_1->inner[inv_x*3+inv_y+4]->number));
-					text.setPosition(55+130+inv_y*70+40, 40+40+inv_x*70+45);
+					text.setString("ammunition +"+std::to_string(player_1->inner[inv_x*3+inv_y+4]->boost_speed));
+					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+50);
 					window.draw(text);
 					text.setCharacterSize(25);
 				}
@@ -1302,9 +1381,6 @@ int main(){
 					text.setString("cool down "+std::to_string(objects_list[ind]->inner[inv_x*3+inv_y-3]->boost_atack_speed/1000));
 					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+60);
 					window.draw(text);
-					text.setString(std::to_string(objects_list[ind]->inner[inv_x*3+inv_y-3]->number));
-					text.setPosition(55+130+inv_y*70+40, 40+40+inv_x*70+45);
-					window.draw(text);
 					text.setCharacterSize(25);
 				}
 				if(objects_list[ind]->inner[inv_x*3+inv_y-3]->type == 3){
@@ -1315,10 +1391,10 @@ int main(){
 					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85);
 					window.draw(text);
 					text.setString("health +"+std::to_string(objects_list[ind]->inner[inv_x*3+inv_y-3]->boost_hp));
-					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+40);
+					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+30);
 					window.draw(text);
-					text.setString(std::to_string(objects_list[ind]->inner[inv_x*3+inv_y-3]->number));
-					text.setPosition(55+130+inv_y*70+40, 40+40+inv_x*70+45);
+					text.setString("ammunition +"+std::to_string(objects_list[ind]->inner[inv_x*3+inv_y-3]->boost_speed));
+					text.setPosition(58+130+inv_y*70-20, 40+40+inv_x*70-85+50);
 					window.draw(text);
 					text.setCharacterSize(25);
 				}
@@ -1328,7 +1404,9 @@ int main(){
 		if(player_1->dead){
 			window.draw(dead_back);
 			button_ch.setPosition(201, 446+50*menue_x);
+			button_ch.setFillColor(Color(200, 0, 0));
 			window.draw(button_ch);
+			button_ch.setFillColor(Color(250, 250, 250));
 			button_back.setPosition(205, 450);
 			window.draw(button_back);
 			button_back.setPosition(205, 500);
