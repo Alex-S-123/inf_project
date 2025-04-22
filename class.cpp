@@ -358,7 +358,7 @@ public:
 		n = 0;
 		//collision = true;
 		set_pos(x, y);
-		for(int i = 0; i < n; i++){
+		for(int i = 0; i < 24; i++){
 			inner[i] = NULL;
 		}
 	}
