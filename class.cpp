@@ -163,6 +163,10 @@ public:
 			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_dist_hit).count() >= inner[2]->boost_atack_speed;
 		}
 
+		void set_items(int n){
+			num_of_items = n;
+		}
+
 		bool give(item* it){
 			if(num_of_items == 24||it==NULL) return 0;
 			if(it->type == 4){
@@ -356,7 +360,6 @@ public:
     treasure(int x, int y):object(0, 0, 25, 25){
 		type = 1;
 		n = 0;
-		//collision = true;
 		set_pos(x, y);
 		for(int i = 0; i < 24; i++){
 			inner[i] = NULL;
@@ -391,6 +394,7 @@ public:
 		y = y0;
 		type = 2;
 		go_to = dest;
+		collision = false;
 	}
 	int destination(){
 		return go_to;
@@ -543,7 +547,6 @@ class bomb: public monster {
 	public:
 		
 		bomb() {
-			std::cout << "Bomb created!" << std::endl;
 			this->type = 3;
 			this->x = 0; 
 			this->y = 0;
@@ -826,10 +829,12 @@ void load_saving(int& nu_lev, int**& level, monster**& monsters_list, object**& 
 		int he;
 		fs >> he;
 		pla->set_hp(he);
+		int counter = 0;
 		for(int i = 0; i < 28; i++){
 			int type;
 			fs >> type;
 			if(type >= 0){
+				if(i > 3) counter++;
 				int a, b, c, d, e, f, g, h, k, l, o;
 				fs >> a >> b >> c >> d >> e >> f >> g >> h;
 				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h);
@@ -838,6 +843,7 @@ void load_saving(int& nu_lev, int**& level, monster**& monsters_list, object**& 
 				pla->inner[i] = NULL;
 			}
 		}
+		pla->set_items(counter);
 	}
 	else{
 		// if save.txt is not correct or does not exist, start level 1
@@ -939,7 +945,7 @@ int main(){
 	button_ch.setFillColor(Color(250, 250, 250));
 	RectangleShape hp_bar(Vector2f(280, 40));
 	hp_bar.setFillColor(Color(200, 0,0));
-	RectangleShape hp_bar_back(Vector2f(288, 23s));
+	RectangleShape hp_bar_back(Vector2f(288, 23));
 	hp_bar_back.setPosition(350-140-4, 633-2);
 	hp_bar_back.setFillColor(Color(0, 0, 0, 175));
 
