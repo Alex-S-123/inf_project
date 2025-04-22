@@ -10,7 +10,6 @@ using namespace sf;
 class item{
 protected:
     int x0, y0, x1, y1; //texture rect for menue
-    //char* name;
 public:
 	int boost_damage, boost_armor, boost_hp, boost_speed, boost_atack_speed, boost_dist,  type, number, cost;
 	item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu){
@@ -38,7 +37,6 @@ public:
         this->x0 = 60;
         this->y0 = 60;
 	}
-    //virtual void use_item() = 0;
 };
 
 
@@ -48,7 +46,6 @@ protected:
     int x0, y0, x1, y1; //texture rect
 	int type;
 	bool collision;
-	//int n;
 
 public:
 	item** inner;
@@ -61,8 +58,7 @@ public:
         this->y1 = ty0;
 		type = 0;
 		inner = new item*[24];
-		for(int i = 0; i < 24; i++) inner[i] = NULL;
-		collision = false;
+		collision = true;
     }
 
 	IntRect tex_rect(){
@@ -90,9 +86,7 @@ public:
 
 	virtual bool give(item* it){return 0;}
 	virtual item* take(int i){return NULL;}
-	virtual int destination(){
-		return 0;
-	}
+	virtual int destination(){return 0;}
 };
 
 class player;
@@ -100,16 +94,13 @@ class player;
 class monster: public object{
 protected:
     int hp, armor, damage, speed;
-	int frames_of_walk;//, frames_after_atack;
+	int frames_of_walk;
 	bool fly;
-
-    //item* inner;
 public:
     monster():object(0,0,0,0){
 		fly = false;
 	};
     void damaged(int damag);
-    int atack();
 	bool is_flying(){
 		return fly;
 	}
@@ -143,7 +134,7 @@ public:
 			damage = 1;
 			armor = 0;
 			gold = 0;
-			dist_atack = 25;
+			dist_atack = 60;
 			inner = new item*[28];
 			num_of_items = 0;
 			time_atack = 3000;
@@ -192,12 +183,10 @@ public:
 		}
 
 		void damaged(int damag) {
-        //this->hp -= std::max(0, abs(this->armor - hp));
             if (this->armor < damag) {
                 this->hp -= (damag - this->armor);
                 if (this->hp <= 0) {
-                    std::cout << "death" << std::endl;
-                    //this->~player();
+                    dead = 1;
                 }
             }
         }
@@ -214,6 +203,9 @@ public:
 			armor = 0;
 			time_atack = 3000;
 			dist_atack = 60;
+			int sind = level[this->get_centre_y()/30+1][(x+xsize)/30+1];
+			if(sind == 3||sind == 6) speed++;
+			if(sind == 4) speed--;
 			for(int i = 0; i<2; i++){
 				if(inner[i]){
 					speed += inner[i]->boost_speed;
@@ -245,14 +237,10 @@ public:
 				}
 				auto time_dist_delta = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_dist_hit).count();
 				if(ind >= 0 && mi<= inner[2]->boost_dist && time_dist_delta >= inner[2]->boost_atack_speed){
-					//monsters_list[ind]->damaged(inner[2]->boost_damage);
 					if (monsters_list[ind]->get_hp() - inner[2]->boost_damage > 0) {
 						monsters_list[ind]->set_hp(-1 * inner[2]->boost_damage);
-						std::cout << "time delta: " << time_dist_delta << std::endl;
-						std::cout << "monster damaged, monster's hp: " << monsters_list[ind]->get_hp() << std::endl;
 					} else {
 						monsters_list[ind] = NULL;
-						std::cout << "monster killed!" << std::endl;
 					}
 					last_dist_hit = std::chrono::system_clock::now();
 					inner[2]->number -= 1;
@@ -306,12 +294,9 @@ public:
                     if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count() > time_atack) {
                         if (monsters_list[i]->get_hp() - this->get_damage() > 0) {
                             monsters_list[i]->set_hp(-1 * this->get_damage());
-                            std::cout << "time delta: " << time_delta << std::endl;
-                            std::cout << "monster damaged, monster's hp: " << monsters_list[i]->get_hp() << std::endl;
                             this->last_hit = std::chrono::system_clock::now();
                         } else {
                             if(monsters_list[i] ->get_type() != 3)monsters_list[i] = NULL;
-                            std::cout << "monster killed!" << std::endl;
                         }
                     }
                 }
@@ -319,7 +304,7 @@ public:
         }
 		
 
-
+		//calculating of texture rect
 		if(frames_after_atack < 20){
 			frames_after_atack ++;
 			if(r_dir){
@@ -373,6 +358,9 @@ public:
 		n = 0;
 		//collision = true;
 		set_pos(x, y);
+		for(int i = 0; i < n; i++){
+			inner[i] = NULL;
+		}
 	}
 
 	bool give(item* it){
@@ -407,21 +395,6 @@ public:
 	int destination(){
 		return go_to;
 	}
-};
-
-class sign: public object{
-private:
-    char* text;
-public:
-    char* read();
-};
-
-class seller: public treasure{
-protected:
-    int* inner;
-    int* price;
-public:
-    bool sell();
 };
 
 
@@ -465,8 +438,6 @@ public:
 
 
     void behavior(player *p) {
-        //std::cout<<"behave"<<std::endl;
-        // walking (now exists only on x-axis)
 		frames_of_walk = (frames_of_walk+1)%20;
 		if(this->x_direction){
 		    if (this->right_direction) {
@@ -509,10 +480,6 @@ public:
                 )
             {
                 this->last_hit = std::chrono::system_clock::now();
-                std::cout << "player damaged " << p->get_hp() << std::endl;
-                if (p->get_hp() <= 0) {
-                    p->dead = true;
-                }
                 this->damaged_player = true;
                 p->damaged(damage);
             }
@@ -608,14 +575,9 @@ class bomb: public monster {
 				this->x += speed;
 				this->distance += speed;
 				if (this->distance >= this->limit) {
-					//std::cout << "EXPLOSION! " << pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) << std::endl;
 					if ((pow(abs(this->get_centre_x() - p->get_centre_x()), 2) + pow(abs(this->get_centre_y() - p->get_centre_y()), 2) <= pow(this->attack_radius, 2))
 						) {
-						std::cout << "player's hp before attack " << p->get_hp() << std::endl;
 						p->damaged(damage);
-						if(p->get_hp() <= 0){
-							p->dead = 1;
-						}
 					}
 					is_attacking = false;
 					frames_after_atack = 0;
@@ -655,6 +617,7 @@ class bomb: public monster {
 			this->period_bomb = rand() % (7000 - 3000 + 1) + 3000;
 			this->xp = xp;
 			this->yp = yp;
+			this->set_pos(xp, yp);
 			this->fly_radius = rad;
 			this->speed = 2;
 			//this->type = 1;
@@ -668,20 +631,19 @@ class bomb: public monster {
 		void behavior(player *p) {
 			// flying (now exists only on x-axis)
 			if (this->up_direction) {
-				if (this->x <= this->xp + this->fly_radius) {
-					this->x += this->speed;
+				if (this->y <= this->yp + this->fly_radius) {
+					this->y += this->speed;
 				} else {
 					this->up_direction = false;
 				}
 			} else {
-				if (this->x >= this->x0 - fly_radius) {
-					this->x -= this->speed;
+				if (this->y >= this->yp - fly_radius) {
+					this->y -= this->speed;
 				} else {
 					this->up_direction = true;
 				}
 			}
 			frames_of_walk = (frames_of_walk+1)%30;
-			// attack (attacks only on x-axis)
 			y0 = (frames_of_walk/10)*50;
 			y1 = y0 + 50;
 			if(up_direction){
@@ -692,10 +654,9 @@ class bomb: public monster {
 				x1 = 0;
 				x0 = 40;
 			}
-	
+			// throwing bomb
 			int counted = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - this->last_hit).count();
 			if (counted >= this->period_bomb) {
-				std::cout << "flight drops bomb" << std::endl;
 				b_attack->start_attack(this->get_centre_x(), this->get_centre_y());
 				this->last_hit = std::chrono::system_clock::now();
 			}
@@ -704,7 +665,7 @@ class bomb: public monster {
 
 class ball: public monster{
 protected:
-	int xl, xr, yl, yr;
+	int xl, xr, yl, yr; // points of rect of walking
 	int xspeed, yspeed;
 	bool damaged_player;
 	int frames_of_walk;
@@ -727,7 +688,7 @@ ball(int xl, int yl, int xr, int yr){
 	frames_of_walk = 0;
 }
 void behavior(player* pla){
-	if(x <= xl || x>=xr || y<=yl || y>=yr){
+	if(x <= xl || x>=xr || y<=yl || y>=yr){ //random speed after collision with walls
 		xspeed = rand() % (3 - 0 + 1) + 0;
 		yspeed = rand() % (3 - 0 + 1) + 0;
 		if(x>=xr){
@@ -744,9 +705,6 @@ void behavior(player* pla){
 		if(!damaged_player){
 			damaged_player = true;
 			pla->damaged(damage);
-			if (pla->get_hp() <= 0) {
-				pla->dead = true;
-			}
 		}
 	}
 	else damaged_player = false;
@@ -765,7 +723,7 @@ void behavior(player* pla){
 };
 
 void load_level(int n_of_level, int**& level, monster**& monsters_list, object**& objects_list, int& num_of_monsters, int& num_of_objects, int& p, int& q, player* pla){
-
+	//loading level from file 
 	if(level){
 		for(int i = 0; i < p+2; i++){
 				if(level[i])delete[] level[i];
@@ -840,14 +798,20 @@ void load_level(int n_of_level, int**& level, monster**& monsters_list, object**
 		int type, x0, y0;
 		fo >> type >> x0 >> y0;
 		if(type == 1){
+			int n_items;
+			int a, b, c, d, e, f, g, h, k, l, o, t;
 			objects_list[i] = new treasure(x0, y0);
+			fo >> n_items;
+			for(int j = 0; j < n_items; j++){
+				fo >> t >> a >> b >> c >> d >> e >> f >> g >> h;
+				objects_list[i]->give(new item(t, a, b, c, d, e, f, g, h));
+			}
 		}
 		if(type == 2){
 			int dest;
 			fo>>dest;
 			objects_list[i] = new teleport(x0, y0, dest);
 		}
-		// here is creating new objects from file
 	}
 
 }
@@ -869,7 +833,6 @@ void load_saving(int& nu_lev, int**& level, monster**& monsters_list, object**& 
 				int a, b, c, d, e, f, g, h, k, l, o;
 				fs >> a >> b >> c >> d >> e >> f >> g >> h;
 				pla->inner[i] = new item(type, a, b, c, d, e, f, g, h);
-				//item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu)
 			}
 			else{
 				pla->inner[i] = NULL;
@@ -877,6 +840,7 @@ void load_saving(int& nu_lev, int**& level, monster**& monsters_list, object**& 
 		}
 	}
 	else{
+		// if save.txt is not correct or does not exist, start level 1
 		nu_lev = 1;
 		load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, pla);
 	}
@@ -890,7 +854,6 @@ void creat_saving(int num_of_level, player* pla){
 	fns << pla->get_hp() << '\n';
 	for(int i = 0; i < 28; i++){
 		if(pla->inner[i]){
-			//item(int t, int damage, int armor, int hp, int speed, int atack_speed, int dist,  int c, int nu)
 			fns << pla->inner[i]->type << " " << pla->inner[i]->boost_damage << " " << pla->inner[i]->boost_armor 
 			<< " " << pla->inner[i]->boost_hp << " " << pla->inner[i]->boost_speed << " " 
 			<< pla->inner[i]->boost_atack_speed << " " << pla->inner[i]->boost_dist 
@@ -918,7 +881,7 @@ int main(){
 	bool in_main_menue = true;
 	int max_hp = 5;
 
-
+	//creating all shapes
 	Font font;
 	font.loadFromFile("textures/arial.ttf");
 	Text text;
@@ -929,27 +892,20 @@ int main(){
 
 	player* player_1 = new player(0,0,36,20,max_hp);
 
-	load_level(num_of_level, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
 	bool dist_atacked = false;
 	int n_iter_drawing = 1000, ind_of_aim = 0;
     int n = 20; //number of plates we see
     int monster_types = 4;
     RectangleShape** monsters_tex = new RectangleShape*[monster_types]; //number of monster types
 	monsters_tex[0] = new RectangleShape(Vector2f(28, 46));
-	//monsters_tex[0]->setFillColor(Color(128, 0, 0));
 	monsters_tex[1] = new RectangleShape(Vector2f(40, 50));
-	//monsters_tex[1]->setFillColor(Color(250, 250, 0));
 	monsters_tex[2] = new RectangleShape(Vector2f(37, 26));
-	//monsters_tex[2]->setFillColor(Color(250, 0, 0));
 	monsters_tex[3] = new RectangleShape(Vector2f(25, 25));
-	//monsters_tex[3]->setFillColor(Color(128, 0, 0));
 
 	int object_types = 2;
     RectangleShape** objects_tex = new RectangleShape*[object_types];
 	objects_tex[0] = new RectangleShape(Vector2f(25, 25));
-	//objects_tex[0]->setFillColor(Color(0, 128, 0)); //comment after adding textures
 	objects_tex[1] = new RectangleShape(Vector2f(40, 60));
-	//objects_tex[1]->setFillColor(Color(0, 0, 128)); //and this
 
 	
 
@@ -977,7 +933,6 @@ int main(){
 
 	
 	RectangleShape dead_back(Vector2f(30*(n+2), 30*(n+2)));
-	//dead_back.setFillColor(Color(0,0,0,150));
 	RectangleShape button_back(Vector2f(250, 36));
 	button_back.setFillColor(Color(140, 70, 20));
 	RectangleShape button_ch(Vector2f(258, 44));
@@ -988,29 +943,11 @@ int main(){
 	hp_bar_back.setPosition(350-140-31, 633);
 	hp_bar_back.setFillColor(Color(0, 0, 0, 175));
 
-
-	//comment lines after
-	player_1->give(new item(0, 1, 1000, 0, 1000, 1000, 1000, 1000, 1));
-	player_1->give(new item(0, 2, 1000, 10, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(0, 3, 10, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(0, 4, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(1, 1, 1, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(1, 2, 2, 10, 10, 1000, 1000, 1000, 1000));
-	player_1->give(new item(1, 3, 3, 10, 10, 1000, 1000, 1000, 1000));
-	player_1->give(new item(2, 1, 1000, 1000, 1000, 1000, 1000, 1, 1));
-	player_1->give(new item(2, 2, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(2, 3, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(2, 4, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
-	player_1->give(new item(4, 2, 1000, 1000, 1000, 1000, 1000, 45, 1000));
-
-	player_1->give(new item(3, 1, 1, 0, 1, 1000, 1000, 1, 1));
-	player_1->give(new item(3, 2, 1, 1, 0, 1000, 1000, 1000, 1000));
-	//before this
     
 
 
 	
-	//add texture
+	//adding textures
 	Texture back_tex;
 	back_tex.loadFromFile("textures/back.png");
 	background.setTexture(&back_tex);
@@ -1079,20 +1016,21 @@ int main(){
 		//all actions of player, monsters, and others
 		if(in_main_menue == false&&player_1->dead==false&&is_winner == false){
 			if(Keyboard::isKeyPressed(Keyboard::F)){
+				//  open/close inventar 
 				if(inv_open) inv_open = false;
 				else inv_open = true;
-				while (Keyboard::isKeyPressed(Keyboard::F)) continue; //not good, but I do not see other ways
+				while (Keyboard::isKeyPressed(Keyboard::F)) continue; 
 				inv_x = 0;
 				inv_y = 0;
 			}
 			for(int i = 0; i < num_of_monsters; i++){
-					if(monsters_list[i])monsters_list[i]->behavior(player_1);
+					if(monsters_list[i])monsters_list[i]->behavior(player_1); // actions of monsters
 				}
 			if((!inv_open) && (player_1->dead == 0)){
-				player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects);
+				player_1->action(level, p, q, monsters_list, num_of_monsters, objects_list, num_of_objects); //actions of player
 				if(Keyboard::isKeyPressed(Keyboard::T)){
+					// teleportation if player is near portal
 					int ind = -1;
-					//std::cout << abs(player_1->get_centre_x()-objects_list[0]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[0]->get_centre_y()) << std::endl;
 					for(int i = 0; i < num_of_objects; i++){
 						if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 2) ind = i;
 					}
@@ -1107,24 +1045,25 @@ int main(){
 				}
 			}
 			else{
+				//actions in inventar
 				if(Keyboard::isKeyPressed(Keyboard::W)) inv_x -= 1;
 				if(Keyboard::isKeyPressed(Keyboard::S)) inv_x += 1;
 				if(Keyboard::isKeyPressed(Keyboard::A)) inv_y -= 1;
 				if(Keyboard::isKeyPressed(Keyboard::D)) inv_y += 1;
 				if(Keyboard::isKeyPressed(Keyboard::Q)){
+					//switch item between inventar and treasure, if near
 					int ind = -1;
-					//std::cout << abs(player_1->get_centre_x()-objects_list[0]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[0]->get_centre_y()) << std::endl;
 					for(int i = 0; i < num_of_objects; i++){
 						if(abs(player_1->get_centre_x()-objects_list[i]->get_centre_x())+abs(player_1->get_centre_y()-objects_list[i]->get_centre_y())<40&&objects_list[i]->get_type() == 1) ind = i;
 					}
 					if(ind>=0){
-						//std::cout << 1 << std::endl;
 						object* tr = objects_list[ind];
 						if(inv_y < 3)tr->give(player_1->take(inv_x*3+inv_y));
 						else player_1->give(tr->take(inv_x*3+inv_y-3));
 					}
 				}
 				if(Keyboard::isKeyPressed(Keyboard::E)){
+					//equping item
 					if(inv_y < 3){
 						item* tmp = player_1->take(inv_x*3+inv_y);
 						if(tmp == NULL){
@@ -1160,6 +1099,7 @@ int main(){
 				while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::A)||Keyboard::isKeyPressed(Keyboard::D)||Keyboard::isKeyPressed(Keyboard::Q)||Keyboard::isKeyPressed(Keyboard::E)) continue;
 			}
 		}else if(in_main_menue){
+			//navigation in main menue
 			if(Keyboard::isKeyPressed(Keyboard::W)) menue_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) menue_x += 1;
 			if(menue_x < 0) menue_x = 2;
@@ -1171,6 +1111,9 @@ int main(){
 				}
 				if(menue_x == 1){
 					load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
+					player_1->dead = false;
+					player_1->set_hp(max_hp);
+					creat_saving(1, player_1);
 					num_of_level = 1;
 					in_main_menue = false;
 				}
@@ -1179,6 +1122,7 @@ int main(){
 			}
 			while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::Q)) continue;
 		}else if(player_1->dead){
+			//navigation in death menue
 			if(Keyboard::isKeyPressed(Keyboard::W)) menue_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) menue_x += 1;
 			if(menue_x < 0) menue_x = 2;
@@ -1193,9 +1137,11 @@ int main(){
 				}
 				if(menue_x == 1){
 					load_level(1, level, monsters_list, objects_list, num_of_monsters, num_of_objects, p, q, player_1);
-					num_of_level = 1;
 					player_1->dead = false;
 					player_1->set_hp(max_hp);
+					creat_saving(1, player_1);
+					num_of_level = 1;
+					
 				}
 				if(menue_x == 2){
 					player_1->set_hp(max_hp);
@@ -1208,6 +1154,7 @@ int main(){
 			while(Keyboard::isKeyPressed(Keyboard::W)||Keyboard::isKeyPressed(Keyboard::S)||Keyboard::isKeyPressed(Keyboard::Q)) continue;
 		}
 		else if(is_winner){
+			//navigation in win menue
 			if(Keyboard::isKeyPressed(Keyboard::W)) menue_x -= 1;
 			if(Keyboard::isKeyPressed(Keyboard::S)) menue_x += 1;
 			if(menue_x < 0) menue_x = 1;
@@ -1235,13 +1182,14 @@ int main(){
         Event event;
         while (window.pollEvent(event))
         {
-
+			//closing window if "ESC" is pressed
 			if(Keyboard::isKeyPressed(Keyboard::Escape)) window.close();
 			if (event.type == Event::Closed) window.close();
         }
     window.clear(Color(192, 192, 192));
 	window.draw(background);
 	if(in_main_menue==false&&is_winner==false){
+		//drawing field
 		int xmaxf = std::min(q, player_1->get_centre_x()/30+n/2+3), ymaxf = std::min(p, player_1->get_centre_y()/30+n/2+3);
         for(int j = std::max(0, player_1->get_centre_x()/30-n/2-1); j < xmaxf; j++){
             for(int i = std::max(0, player_1->get_centre_y()/30-n/2-1); i < ymaxf; i++){
@@ -1252,6 +1200,7 @@ int main(){
                 }
             }
         }
+		//drawing objects
 
 		for(int i = 0; i < num_of_objects; i++){
             if(objects_list[i]){
@@ -1366,6 +1315,11 @@ int main(){
 					else if(dr->type == 4){
 						item_dr.setTextureRect(IntRect(0, 59*11, 60, 59));
 						window.draw(item_dr);
+						text.setCharacterSize(15);
+						text.setString(std::to_string(dr->cost));
+						text.setPosition(55+130+(i%6)*70+40, 40+40+(i/6)*70+45);
+						window.draw(text);
+						text.setCharacterSize(25);
 					}
 				}
 				
@@ -1688,6 +1642,7 @@ int main(){
 	window.display();
 	while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
     }
+
 	if(level){
 		for(int i = 0; i < p+2; i++){
 				delete[] level[i];
@@ -1703,5 +1658,13 @@ int main(){
 	}
 	if(objects_list)delete[] objects_list;
 	delete player_1;
+	for(int i = 0; i < monster_types; i++){
+		delete monsters_tex[i];
+		delete mons_te[i];
+	}
+	for(int i = 0; i < object_types; i++){
+		delete objects_tex[i];
+		delete obj_tex[i];
+	}
     return 0;
 }
