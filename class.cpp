@@ -939,8 +939,8 @@ int main(){
 	button_ch.setFillColor(Color(250, 250, 250));
 	RectangleShape hp_bar(Vector2f(280, 40));
 	hp_bar.setFillColor(Color(200, 0,0));
-	RectangleShape hp_bar_back(Vector2f(341, 19));
-	hp_bar_back.setPosition(350-140-31, 633);
+	RectangleShape hp_bar_back(Vector2f(288, 23s));
+	hp_bar_back.setPosition(350-140-4, 633-2);
 	hp_bar_back.setFillColor(Color(0, 0, 0, 175));
 
     
@@ -1210,7 +1210,7 @@ int main(){
                 }
             }
 		}
-
+		//drawing monsters
 		for(int i = 0; i < num_of_monsters; i++){
             if(monsters_list[i]){
                 if(abs(player_1->get_x()-monsters_list[i]->get_x())+abs(player_1->get_y()-monsters_list[i]->get_y()) < 40*30){
@@ -1222,7 +1222,7 @@ int main(){
 		}
 
 		
-		//std::cout << (player_1->can_atack_dist()) << std::endl;
+		//drawing aim if player can atack dist
 		if(player_1->can_atack_dist() || n_iter_drawing < 100||dist_atacked){
 			if(dist_atacked == true && player_1->can_atack_dist() == false) n_iter_drawing = 80;
 			dist_atacked = player_1->can_atack_dist();
@@ -1253,15 +1253,17 @@ int main(){
 			}
 		}
 		if (player_1->dead == 0) {
+			//drawing player and health bar
 			play.setTextureRect(player_1->tex_rect());
             window.draw(play);
-			float hp = player_1->get_hp() + 1;
+			float hp = player_1->get_hp();
 			hp_bar.setPosition(350-140.f*hp/max_hp, 635);
 			hp_bar.setSize(Vector2f(280*hp/max_hp, 15.f));
 			window.draw(hp_bar_back);
 			window.draw(hp_bar);
 		}
 		if(inv_open){
+			//drawing inventar
 			window.draw(inv_back);
 			inv_ch.setPosition(55+130+inv_y*70-5, 40+40+inv_x*70-5);
 			window.draw(inv_ch);
@@ -1580,6 +1582,7 @@ int main(){
 			}
 		}
 		if(player_1->dead){
+			//drawing death menue
 			window.draw(dead_back);
 			button_ch.setPosition(201, 446+50*menue_x);
 			button_ch.setFillColor(Color(200, 0, 0));
@@ -1603,6 +1606,7 @@ int main(){
 		}
 	}
 	else if(in_main_menue){
+		//drawing main menue
 		window.draw(main_back);
 		button_ch.setPosition(46, 446+50*menue_x);
 		window.draw(button_ch);
@@ -1623,26 +1627,27 @@ int main(){
 		window.draw(text);
 	}
 	else if(is_winner){
+		//drawing win menue
 		window.draw(win_back);
-			button_ch.setPosition(361, 50+446+50*menue_x);
-			button_ch.setFillColor(Color(255, 220, 51));
-			window.draw(button_ch);
-			button_ch.setFillColor(Color(250, 250, 250));
-			button_back.setPosition(365, 500);
-			window.draw(button_back);
-			button_back.setPosition(365, 550);
-			window.draw(button_back);
-			text.setString("New game");
-			text.setPosition(375, 502);
-			window.draw(text);
-			text.setString("Main menue");
-			text.setPosition(375, 552);
-			window.draw(text);
+		button_ch.setPosition(361, 50+446+50*menue_x);
+		button_ch.setFillColor(Color(255, 220, 51));
+		window.draw(button_ch);
+		button_ch.setFillColor(Color(250, 250, 250));
+		button_back.setPosition(365, 500);
+		window.draw(button_back);
+		button_back.setPosition(365, 550);
+		window.draw(button_back);
+		text.setString("New game");
+		text.setPosition(375, 502);
+		window.draw(text);
+		text.setString("Main menue");
+		text.setPosition(375, 552);
+		window.draw(text);
 	}
 	window.display();
-	while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue;
+	while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()-start).count() < 25) continue; //fixed fps
     }
-
+	//deleting arrays after closing game
 	if(level){
 		for(int i = 0; i < p+2; i++){
 				delete[] level[i];
