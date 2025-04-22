@@ -18,6 +18,6 @@
 * In game use **W** **A** **S** **D** buttons to move, **Q** button to fight, **F** button to open inventar
 * In inventar use **W** **A** **S** **D** buttons to navigate, **E** button to equip selected item
 * If you open inventar near chest, use **Q** button to swap selected item between chest and player
-* If you equiped poisons, press **R** button to use it
+* If you equiped poisons, press **R** to use it
 * If you have distant weapon and see aim on the monster, press **E** to attack this monster
 * In any moment you can use **ESC** button to quit game
