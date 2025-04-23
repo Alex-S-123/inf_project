@@ -21,3 +21,10 @@
 * If you equiped poisons, press **R** to use it
 * If you have distant weapon and see aim on the monster, press **E** to attack this monster
 * In any moment you can use **ESC** button to quit game
+
+
+g++ -c main.cpp item.cpp object.cpp functions.cpp monster.cpp player.cpp 
+
+g++ functions.o item.o main.o monster.o object.o player.o -lsfml-graphics -lsfml-window -lsfml-system -o game
+
+./game
