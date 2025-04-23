@@ -384,7 +384,7 @@ int main(){
 
 				}
 			}
-			if(ind >= 0){
+			if(ind >= 0 && mi < player_1->inner[2]->boost_dist){
 
 				if(n_iter_drawing < 100){
 					n_iter_drawing+=1;
