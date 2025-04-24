@@ -2,13 +2,22 @@
 
 ### Installing ###
 
-#### Linux ####
+#### Using cmake ####
 
-1. Check that packages g++ and libsfml-dev are installed. If no, install it using your package manager
-2. Download and unpack **game.zip** or download **game** folder
+1. Check that packages g++ and libsfml-dev are installed and cmake is working correctly.
+2. Download and unpack **game_cmake.zip** or download **game_cmake** folder
+3. Change directory in terminal to **/game/build** folder
+4. Run the following commands: cmake.. ; make 
+5. Next run file **Game** from folder **/game/build**
+
+
+#### With no cmake ####
+
+1. Check that packages g++ and libsfml-dev are installed.
+2. Download and unpack **game_cmake.zip** or download **game_cmake** folder
 3. Change directory in terminal to **game** folder
-4. Run the following command: g++ -c class.cpp && g++ class.o -lsfml-graphics -lsfml-window -lsfml-system -o gamesoy && ./gamesoy
-5. Next times run file **gamesoy** from folder **game**
+4. Run the following command: g++ -c main.cpp item.cpp object.cpp functions.cpp monster.cpp player.cpp && g++ functions.o item.o main.o monster.o object.o player.o -lsfml-graphics -lsfml-window -lsfml-system -o Game
+5. Next run file **Game** from folder **game**
 
 
 
@@ -21,10 +30,3 @@
 * If you equiped poisons, press **R** to use it
 * If you have distant weapon and see aim on the monster, press **E** to attack this monster
 * In any moment you can use **ESC** button to quit game
-
-
-g++ -c main.cpp item.cpp object.cpp functions.cpp monster.cpp player.cpp 
-
-g++ functions.o item.o main.o monster.o object.o player.o -lsfml-graphics -lsfml-window -lsfml-system -o game
-
-./game
