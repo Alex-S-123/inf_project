@@ -32,7 +32,7 @@
 * In any moment you can use **ESC** button to quit game
 
 
-  ### Links ###
+### Links ###
 
 Game trailer: https://disk.yandex.ru/i/rnZcRIV5pGLHcA
 
