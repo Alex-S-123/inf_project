@@ -30,3 +30,10 @@
 * If you equiped poisons, press **R** to use it
 * If you have distant weapon and see aim on the monster, press **E** to attack this monster
 * In any moment you can use **ESC** button to quit game
+
+
+  ### Links ###
+
+Game trailer: https://disk.yandex.ru/i/rnZcRIV5pGLHcA
+
+Code review: https://disk.yandex.ru/i/4XHct3wNQx4IqA
